@@ -63,7 +63,7 @@ class Environment(object):
         for i in range(0, self.food_max_count):
             for j in range(0, self.person_max_count):
                 if self.isCollision(self.foods[i], self.persons[j]):
-                    self.persons[j].hunger = self.persons[j].hunger - self.foods[i].calories
+                    self.persons[j].hunger = self.persons[j].hunger - self.foods[i].calories * 0.05
                     if self.persons[j].hunger < 0:
                         self.persons[j].hunger = 0
 
@@ -79,10 +79,10 @@ class Environment(object):
             # Далеко не идеальное решение
             if obj.movementAngle >= 180:
                 obj.movementAngle = obj.movementAngle - 180
-                obj.movementSpeed = 2
+                obj.movementSpeed = 1.5
             else:
                 obj.movementAngle = obj.movementAngle + 180
-                obj.movementSpeed = 2
+                obj.movementSpeed = 1.5
 
     def isWallCollisition(self, obj: EnvObject) -> bool:
         radius = obj.width / 2
@@ -115,12 +115,12 @@ class Environment(object):
     def moveResistanceProcess(self, obj: EnvObject):
         obj.movementSpeed = obj.movementSpeed * 0.99
 
-    def rotateLeft(self, obj: EnvObject):
+    def rotateRight(self, obj: EnvObject):
         obj.movementAngle = obj.movementAngle - 1.5
         if obj.movementAngle < 0:
             obj.movementAngle = 360 - obj.movementAngle
 
-    def rotateRight(self, obj: EnvObject):
+    def rotateLeft(self, obj: EnvObject):
         obj.movementAngle = obj.movementAngle + 1.5
         if obj.movementAngle > 360:
             obj.movementAngle = obj.movementAngle - 360
@@ -131,4 +131,4 @@ class Environment(object):
             obj.hunger = 100
 
     def getRandCoords(self) -> [float, float]:
-        return random() * self.max_x, random() * self.max_y
+        return random() * (self.max_x - 60) + 30, random() * (self.max_y - 60) + 30

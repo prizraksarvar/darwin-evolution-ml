@@ -66,6 +66,8 @@ class MainWindow(QtWidgets.QMainWindow):
             painter.drawEllipse(food.x - food.width / 2, food.y - food.width / 2, food.width, food.width)
 
         painter.setPen(penPerson)
+        painter.drawText(5, 15, "Hunger")
+        i = 0
         for person in environment.persons:
             painter.drawEllipse(person.x - person.width / 2, person.y - person.width / 2, person.width, person.width)
             angle = person.movementAngle
@@ -76,6 +78,9 @@ class MainWindow(QtWidgets.QMainWindow):
             x2 = person.x
             y2 = person.y
             painter.drawLine(x, y, x2, y2)
+
+            painter.drawText(5, 25 + 10 * i, "Person{0}: {1:.2f}%".format(i + 1, person.hunger))
+            i = i + 1
 
         # painter.drawRect(60, 60, 150, 100)
 
