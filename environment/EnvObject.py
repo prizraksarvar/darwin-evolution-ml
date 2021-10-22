@@ -9,4 +9,6 @@ class EnvObject(object):
         self.x = x
         self.y = y
         self.width = width
+        self.movementAngle = 0
+        self.movementSpeed = 0
 

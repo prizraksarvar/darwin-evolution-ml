@@ -44,6 +44,7 @@ class Environment(object):
             self.moveObject(self.persons[i])
             self.moveResistanceProcess(self.persons[i])
             self.wallCollisitionProcess(self.persons[i])
+            self.hungerProcess(self.persons[i])
 
         self.collisionProcess()
 
@@ -78,10 +79,10 @@ class Environment(object):
             # Далеко не идеальное решение
             if obj.movementAngle >= 180:
                 obj.movementAngle = obj.movementAngle - 180
-                obj.movementSpeed += 2
+                obj.movementSpeed = 2
             else:
                 obj.movementAngle = obj.movementAngle + 180
-                obj.movementSpeed += 2
+                obj.movementSpeed = 2
 
     def isWallCollisition(self, obj: EnvObject) -> bool:
         radius = obj.width / 2
@@ -102,27 +103,32 @@ class Environment(object):
         radius = obj.movementSpeed
         x = radius * sin(pi * 2 * angle / 360)
         y = radius * cos(pi * 2 * angle / 360)
-        obj.x = x
-        obj.y = y
+        obj.x = x + obj.x
+        obj.y = y + obj.y
 
     def increaseSpeed(self, obj: EnvObject):
-        obj.movementSpeed = obj.movementSpeed + 0.083333
+        obj.movementSpeed = obj.movementSpeed + 0.01
 
     def decreaseSpeed(self, obj: EnvObject):
-        obj.movementSpeed = obj.movementSpeed + 0.083333
+        obj.movementSpeed = obj.movementSpeed - 0.01
 
     def moveResistanceProcess(self, obj: EnvObject):
-        obj.movementSpeed = obj.movementSpeed * 0.9916666
+        obj.movementSpeed = obj.movementSpeed * 0.99
 
     def rotateLeft(self, obj: EnvObject):
-        obj.movementAngle = obj.movementAngle - 0.5
+        obj.movementAngle = obj.movementAngle - 1.5
         if obj.movementAngle < 0:
             obj.movementAngle = 360 - obj.movementAngle
 
     def rotateRight(self, obj: EnvObject):
-        obj.movementAngle = obj.movementAngle + 0.5
+        obj.movementAngle = obj.movementAngle + 1.5
         if obj.movementAngle > 360:
             obj.movementAngle = obj.movementAngle - 360
+
+    def hungerProcess(self, obj: Person):
+        obj.hunger = obj.hunger + 0.002
+        if obj.hunger > 100:
+            obj.hunger = 100
 
     def getRandCoords(self) -> [float, float]:
         return random() * self.max_x, random() * self.max_y
