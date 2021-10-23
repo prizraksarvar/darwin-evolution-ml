@@ -13,12 +13,14 @@ class Application(object):
 
     environment: Environment
     controls: [Control]
+    enableKeyboard: bool
 
     def __init__(self, environment: Environment, controls: [Control], enableKeyboard: bool):
         print("Start")
 
-        self.environment = Environment(400, 300, 1, 1)
-        self.controls = [Control()]
+        self.environment = environment
+        self.controls = controls
+        self.enableKeyboard = enableKeyboard
 
         self.app = QtWidgets.QApplication(sys.argv)
         self.window = MainWindow(self.loop, self.keyPressEventHook, self.keyReleaseEventHook)
@@ -36,6 +38,8 @@ class Application(object):
         self.controls[0].rotateRight = False
 
     def keyPressEventHook(self, event: QtGui.QKeyEvent):
+        if not self.enableKeyboard:
+            return
         if event.key() == Qt.Key_Up:
             self.controls[0].moveForward = True
         if event.key() == Qt.Key_Down:
@@ -47,6 +51,8 @@ class Application(object):
         pass
 
     def keyReleaseEventHook(self, event: QtGui.QKeyEvent):
+        if not self.enableKeyboard:
+            return
         if event.key() == Qt.Key_Up:
             self.controls[0].moveForward = False
         if event.key() == Qt.Key_Down:
