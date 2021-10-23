@@ -14,7 +14,7 @@ class Application(object):
     environment: Environment
     controls: [Control]
 
-    def __init__(self):
+    def __init__(self, environment: Environment, controls: [Control], enableKeyboard: bool):
         print("Start")
 
         self.environment = Environment(400, 300, 1, 1)
@@ -27,7 +27,6 @@ class Application(object):
     def loop(self):
         self.environment.tickUpdate(self.controls)
         self.window.draw(self.environment)
-        # TODO: здесь может не очищатся значение, нужно проверить
         pass
 
     def clearControl(self):
@@ -59,4 +58,8 @@ class Application(object):
         pass
 
 
-app = Application()
+environment = Environment(400, 300, 1, 1)
+controls = [Control()]
+
+# Ручное управление
+app = Application(environment, controls, True)
