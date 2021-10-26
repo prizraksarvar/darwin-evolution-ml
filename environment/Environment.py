@@ -21,19 +21,21 @@ class Environment(object):
         self.max_y = max_y
         self.food_max_count = food_max_count
         self.person_max_count = person_max_count
-        self.foods = []
-        self.persons = []
+        self.foods = [Food(0, 0, 0, 0)]*self.food_max_count
+        self.persons = [Person(0, 0, 0, 0)]*self.person_max_count
 
         # Инициализируем генератор случайных чисел
         seed(version=2)
+        self.reinit()
 
-        for i in range(0, food_max_count):
+    def reinit(self):
+        for i in range(0, self.food_max_count):
             point = self.getRandCoords()
-            self.foods.append(Food(point[0], point[1], 10, 30))
+            self.foods[i] = Food(point[0], point[1], 10, 30)
 
         for i in range(0, self.person_max_count):
             point = self.getRandCoords()
-            self.persons.append(Person(point[0], point[1], 10, 10))
+            self.persons[i] = Person(point[0], point[1], 10, 10)
 
     def tickUpdate(self, controls: [Control]):
         for i in range(0, self.food_max_count):
@@ -87,12 +89,20 @@ class Environment(object):
     def isWallCollisition(self, obj: EnvObject) -> bool:
         radius = obj.width / 2
         if obj.x - radius <= 0:
+            # TODO: костыль чтобы не проавливаться сквозь стены
+            obj.x = 0 + radius
             return True
         if obj.x + radius >= self.max_x:
+            # TODO: костыль чтобы не проавливаться сквозь стены
+            obj.x = self.max_x - radius
             return True
         if obj.y - radius <= 0:
+            # TODO: костыль чтобы не проавливаться сквозь стены
+            obj.y = 0 + radius
             return True
         if obj.y + radius >= self.max_y:
+            # TODO: костыль чтобы не проавливаться сквозь стены
+            obj.y = self.max_y - radius
             return True
         return False
 

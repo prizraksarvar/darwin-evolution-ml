@@ -5,6 +5,7 @@ from PyQt5.QtCore import Qt
 from MainWindow import MainWindow
 from environment.Environment import Environment
 from environment.control import Control
+from ml.learn_spinal_cord import SpinalCordLearner
 
 
 class Application(object):
@@ -13,23 +14,38 @@ class Application(object):
 
     environment: Environment
     controls: [Control]
-    enableKeyboard: bool
+    externalControl: bool
 
-    def __init__(self, environment: Environment, controls: [Control], enableKeyboard: bool):
+    def __init__(self, environment: Environment, controls: [Control], loopFun, externalControl: bool):
         print("Start")
 
         self.environment = environment
         self.controls = controls
-        self.enableKeyboard = enableKeyboard
+        self.externalControl = externalControl
+        self.loopFun = loopFun
 
         self.app = QtWidgets.QApplication(sys.argv)
-        self.window = MainWindow(self.loop, self.keyPressEventHook, self.keyReleaseEventHook)
+        self.window = MainWindow(self.loop, self.backgroundLoop, self.keyPressEventHook, self.keyReleaseEventHook)
         self.app.exec_()
 
     def loop(self):
-        self.environment.tickUpdate(self.controls)
+        if not self.externalControl:
+            self.environment.tickUpdate(self.controls)
         self.window.draw(self.environment)
         pass
+
+    def backgroundLoop(self):
+        if not self.externalControl:
+            return
+        self.loopFun()
+        self.environment.tickUpdate(self.controls)
+        if self.environment.persons[0].hunger == 100:
+            # exit(0)
+            self.environment.reinit()
+        if self.environment.persons[0].hunger == 0:
+            # exit(0)
+            self.app.quitOnLastWindowClosed()
+            self.app.closeAllWindows()
 
     def clearControl(self):
         self.controls[0].moveForward = False
@@ -38,7 +54,7 @@ class Application(object):
         self.controls[0].rotateRight = False
 
     def keyPressEventHook(self, event: QtGui.QKeyEvent):
-        if not self.enableKeyboard:
+        if self.externalControl:
             return
         if event.key() == Qt.Key_Up:
             self.controls[0].moveForward = True
@@ -51,7 +67,7 @@ class Application(object):
         pass
 
     def keyReleaseEventHook(self, event: QtGui.QKeyEvent):
-        if not self.enableKeyboard:
+        if self.externalControl:
             return
         if event.key() == Qt.Key_Up:
             self.controls[0].moveForward = False
@@ -68,4 +84,9 @@ environment = Environment(400, 300, 1, 1)
 controls = [Control()]
 
 # Ручное управление
-app = Application(environment, controls, True)
+# app = Application(environment, controls, None, False)
+
+# ML с обучением
+learner = SpinalCordLearner(environment, controls)
+app = Application(environment, controls, learner.learnLoop, True)
+learner.done()

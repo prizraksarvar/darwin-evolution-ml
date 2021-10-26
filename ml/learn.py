@@ -68,8 +68,8 @@ class Learner(object):
             self.test(test_dataloader, model, loss_fn)
         print("Done!")
 
-        torch.save(model.state_dict(), "direction_find_model.pth")
-        print("Saved PyTorch Model State to direction_find_model.pth")
+        torch.save(model.state_dict(), "plus_model.pth")
+        print("Saved PyTorch Model State to plus_model.pth")
 
     def train(self, dataloader, model, loss_fn, optimizer):
         size = len(dataloader.dataset)

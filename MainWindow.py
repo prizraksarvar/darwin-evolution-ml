@@ -1,9 +1,10 @@
 from math import sin, cos, pi
 
 from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QThread
 import matplotlib
 
+from Worker import Worker
 from environment.Environment import Environment
 
 matplotlib.use('Qt5Agg')
@@ -11,10 +12,11 @@ DIR = '/home/prizrak/Загрузки/'
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, loop, keyPressEventHook, keyReleaseEventHook, *args, **kwargs):
+    def __init__(self, loop, backgroundLoop, keyPressEventHook, keyReleaseEventHook, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
 
         self.extLoop = loop
+        self.backgroundLoop = backgroundLoop
         self.keyPressEventHook = keyPressEventHook
         self.keyReleaseEventHook = keyReleaseEventHook
         self.label = QtWidgets.QLabel()
@@ -29,6 +31,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.timer.start(1000 / 60)
 
         self.draw()
+        # Фоновый воркер что то я подумал заморочки с мьютексами это через чур пока
+        # self.runWorkerTask()
+
+        if self.backgroundLoop is not None:
+            self.timerBackground = QTimer()
+            self.timerBackground.timeout.connect(self.backgroundLoop)
+            self.timerBackground.start(0)
+
 
     def loop(self):
         self.extLoop()
@@ -87,3 +97,29 @@ class MainWindow(QtWidgets.QMainWindow):
         painter.end()
 
         self.repaint()
+
+    def runWorkerTask(self):
+        if self.backgroundLoop is None:
+            return
+        # Step 2: Create a QThread object
+        self.thread = QThread()
+        # Step 3: Create a worker object
+        self.worker = Worker(self.backgroundLoop)
+        # Step 4: Move worker to the thread
+        self.worker.moveToThread(self.thread)
+        # Step 5: Connect signals and slots
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.progress.connect(self.reportProgress)
+        # Step 6: Start the thread
+        self.thread.start()
+
+        # Final resets
+        # self.thread.finished.connect(
+        #     lambda: self.longRunningBtn.setEnabled(True)
+        # )
+        # self.thread.finished.connect(
+        #     lambda: self.stepLabel.setText("Long-Running Step: 0")
+        # )
