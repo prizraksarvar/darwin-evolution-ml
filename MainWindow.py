@@ -1,4 +1,4 @@
-from math import sin, cos, pi
+from math import sin, cos, pi, degrees, atan, sqrt
 
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtCore import Qt, QTimer, QThread
@@ -40,7 +40,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.timerBackground.timeout.connect(self.backgroundLoop)
             self.timerBackground.start(0)
 
-
     def loop(self):
         self.extLoop()
 
@@ -49,11 +48,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.keyReleaseEventHook(event)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        if event.key() == Qt.Key_0:
+            if self.timerBackground is None:
+                return
+            self.timerBackground.stop()
+            pass
         if event.key() == Qt.Key_Minus:
             if self.timerBackground is None:
                 return
             self.timerBackground.stop()
-            self.timerBackground.start(1000/60)
+            self.timerBackground.start(1000 / 60)
             pass
         if event.key() == Qt.Key_Equal:
             if self.timerBackground is None:
@@ -103,9 +107,54 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # painter.drawRect(60, 60, 150, 100)
 
+        self.paintDebug(painter, environment)
+
         painter.end()
 
         self.repaint()
+
+    def paintDebug(self, painter, environment: Environment = None):
+        penRed = QtGui.QPen()
+        penRed.setWidth(1)
+        penRed.setColor(QtGui.QColor("#FF0000"))
+
+        painter.setPen(penRed)
+
+        person = environment.persons[0]
+        food = environment.foods[0]
+
+        dX = person.x - food.x
+        dY = person.y - food.y
+        targetAngle = degrees(atan(dX / dY))
+        if person.y > food.y:
+            targetAngle = targetAngle - 180
+        if targetAngle < 0:
+            targetAngle = 360 + targetAngle
+
+        rotateDirection = -1
+        angleDiff = targetAngle - person.movementAngle
+        if angleDiff < 0:
+            angleDiff = 360 + angleDiff
+        if angleDiff > 180:
+            rotateDirection = 1
+            angleDiff = 360 - angleDiff
+
+        targetSpeed = 3
+        if angleDiff >= 45:
+            targetSpeed = -2
+
+        distance = sqrt((person.x - food.x) ** 2 + (person.y - food.y) ** 2)
+
+        painter.drawText(300, 15, "Distance: {0:.2f}".format(distance))
+        painter.drawText(300, 25, "Angle Dif: {0:.2f}".format(angleDiff))
+        painter.drawText(300, 35, "Angle: {0:.2f}".format(targetAngle))
+        painter.drawText(300, 45, "Direction: {0:.2f}".format(rotateDirection))
+
+        angle = targetAngle
+        radius = distance
+        x = radius * sin(pi * 2 * angle / 360) + person.x
+        y = radius * cos(pi * 2 * angle / 360) + person.y
+        painter.drawLine(x, y, person.x, person.y)
 
     def runWorkerTask(self):
         if self.backgroundLoop is None:

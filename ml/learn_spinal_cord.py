@@ -1,5 +1,6 @@
 import math
 import os
+from random import random
 
 import numpy as np
 import torch
@@ -45,18 +46,21 @@ class SpinalCordLearner(object):
         person = self.environment.persons[0]
         food = self.environment.foods[0]
 
-        targetAngle = math.degrees(math.atan((person.x - food.x) / (person.y - food.y)))
+        dX = person.x - food.x
+        dY = person.y - food.y
+        targetAngle = math.degrees(math.atan(dX / dY))
+        if person.y > food.y:
+            targetAngle = targetAngle - 180
         if targetAngle < 0:
-            targetAngle = 360 - targetAngle
+            targetAngle = 360 + targetAngle
 
-        rotateDirection = 1
+        rotateDirection = -1
         angleDiff = targetAngle - person.movementAngle
         if angleDiff < 0:
+            angleDiff = 360 + angleDiff
+        if angleDiff > 180:
+            rotateDirection = 1
             angleDiff = 360 - angleDiff
-        if angleDiff < 180:
-            rotateDirection = -1
-        else:
-            angleDiff = angleDiff - 180
 
         targetSpeed = 3
         if angleDiff >= 45:
@@ -84,18 +88,19 @@ class SpinalCordLearner(object):
         self.controls[0].rotateLeft = False
         self.controls[0].rotateRight = False
 
-        if pred[0] > 0.2 and pred[1] < pred[0]:
+        mean = pred.mean()
+        if pred[0] > 0.45:  # and pred[1] < pred[0]:
             self.controls[0].moveForward = True
-        if pred[1] > 0.2 and pred[0] < pred[1]:
+        if pred[0] < 0.55:  # and pred[0] < pred[1]:
             self.controls[0].moveBack = True
-        if pred[2] > 0.2 and pred[3] < pred[2]:
+        if pred[1] < 0.45:  # and pred[3] < pred[2]:
             self.controls[0].rotateLeft = True
-        if pred[3] > 0.2 and pred[2] < pred[3]:
+        if pred[1] > 0.55:  # and pred[2] < pred[3]:
             self.controls[0].rotateRight = True
 
         self.lastXs.append(origX)
         predY = pred.detach().numpy()
-        self.lastYs.append([predY[0], predY[1], predY[2], predY[3]])
+        self.lastYs.append([predY[0], predY[1]])
 
         # началась новая игра
         # if person.hunger == 10 and self.lastHunger > 90:
@@ -192,15 +197,22 @@ class SpinalCordLearner(object):
         vals = [0.0] * count
         running_add = v
         for t in reversed(range(count)):
-            vt = [0, 0, 0, 0]
-            i1 = 0
-            if indexes[t][0] < indexes[t][1]:
-                i1 = 1
-            i2 = 2
-            if indexes[t][2] < indexes[t][3]:
-                i2 = 3
-            vt[i1] = running_add
-            vt[i2] = running_add
+            vt = [0, 0]
+            it = indexes[t]
+            if it[0] < 0.45:
+                vt[0] = running_add if running_add < 0 else -running_add
+            elif it[0] > 0.55:
+                vt[0] = running_add if running_add < 0 else -running_add
+            else:
+                vt[0] = running_add # if random() > 0.5 else -running_add
+
+            if it[1] < 0.45:
+                vt[1] = running_add if running_add < 0 else -running_add
+            elif it[1] > 0.55:
+                vt[1] = running_add if running_add < 0 else -running_add
+            else:
+                vt[1] = running_add # if random() > 0.5 else -running_add
+
             vals[t] = vt
             running_add = running_add * gamma
 

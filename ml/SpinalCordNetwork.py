@@ -15,14 +15,14 @@ class SpinalCordNetwork(nn.Module):
         )
         self.layer4 = nn.Linear(16, 8)
         self.layer5 = nn.Sequential(
-            nn.Linear(8, 4),
+            nn.Linear(8, 2),
         )
         # https://pytorch.org/docs/stable/generated/torch.nn.Softsign.html#torch.nn.Softsign
         self.layer6 = nn.Softplus()
         # На выходе ожидаем forward, back, rotate_left, rotate_right
 
     # На вход подаем angle, targetAngle, rotateDirection, speed, targetSpeed, distance, hunger
-    # На выходе ожидаем forward, back, rotate_left, rotate_right
+    # На выходе ожидаем forward/back, rotate_left/rotate_right
     def forward(self, x) -> float:
         out = self.layer1(x)
         out = self.layer2(out)
