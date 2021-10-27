@@ -65,7 +65,7 @@ class Environment(object):
         for i in range(0, self.food_max_count):
             for j in range(0, self.person_max_count):
                 if self.isCollision(self.foods[i], self.persons[j]):
-                    self.persons[j].hunger = self.persons[j].hunger - self.foods[i].calories * 0.05
+                    self.persons[j].hunger = self.persons[j].hunger - self.foods[i].calories * 0.1
                     if self.persons[j].hunger < 0:
                         self.persons[j].hunger = 0
 

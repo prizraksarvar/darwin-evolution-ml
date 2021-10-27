@@ -6,8 +6,8 @@ class SpinalCordNetwork(nn.Module):
     def __init__(self):
         super(SpinalCordNetwork, self).__init__()
 
-        # На вход подаем angle, targetAngle, rotateDirection, speed, targetSpeed
-        self.layer1 = nn.Linear(5, 8)
+        # На вход подаем angle, targetAngle, rotateDirection, speed, targetSpeed, distance
+        self.layer1 = nn.Linear(6, 8)
         self.layer2 = nn.Sequential(
             nn.Linear(8, 16),
             nn.ReLU(),
@@ -20,12 +20,12 @@ class SpinalCordNetwork(nn.Module):
         self.layer5 = nn.Softplus()
         # На выходе ожидаем forward, back, rotate_left, rotate_right
 
-    # На вход подаем angle, targetAngle, rotateDirection, speed, targetSpeed
+    # На вход подаем angle, targetAngle, rotateDirection, speed, targetSpeed, distance
     # На выходе ожидаем forward, back, rotate_left, rotate_right
     def forward(self, x) -> float:
         out = self.layer1(x)
         out = F.relu(self.layer2(out))
         out = self.layer3(out)
-        out = F.relu(self.layer4(out))
+        out = self.layer4(out)
         out = self.layer5(out)
         return out

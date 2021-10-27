@@ -1,4 +1,5 @@
 import math
+import os
 
 import numpy as np
 import torch
@@ -30,10 +31,12 @@ class SpinalCordLearner(object):
         self.lastHunger = environment.persons[0].hunger
 
         self.model = SpinalCordNetwork().to(device)
+        if os.path.isfile("spinal_cord_model.pth"):
+            self.model.load_state_dict(torch.load("spinal_cord_model.pth"))
         self.loss_fn = nn.L1Loss()
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
-        # self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
-        self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
+        # self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
 
         self.epochs = 0
         self.iter = 0
@@ -59,12 +62,15 @@ class SpinalCordLearner(object):
         if angleDiff >= 45:
             targetSpeed = -2
 
+        distance = math.sqrt((person.x - food.x) ** 2 + (person.y - food.y) ** 2)
+
         origX = [
             person.movementAngle / 360,
             targetAngle / 360,
             rotateDirection,
             person.movementSpeed / 3,
-            targetSpeed / 3
+            targetSpeed / 3,
+            distance / 500
         ]
         X = torch.Tensor(np.array(origX)).float()
         X = X.to(device)
@@ -77,23 +83,33 @@ class SpinalCordLearner(object):
         self.controls[0].rotateLeft = False
         self.controls[0].rotateRight = False
 
-        if pred[1] < pred[0]:
+        if pred[0] > 0.2 and pred[1] < pred[0]:
             self.controls[0].moveForward = True
-        if pred[0] < pred[1]:
+        if pred[1] > 0.2 and pred[0] < pred[1]:
             self.controls[0].moveBack = True
-        if pred[3] < pred[2]:
+        if pred[2] > 0.2 and pred[3] < pred[2]:
             self.controls[0].rotateLeft = True
-        if pred[2] < pred[3]:
+        if pred[3] > 0.2 and pred[2] < pred[3]:
             self.controls[0].rotateRight = True
 
         self.lastXs.append(origX)
         predY = pred.detach().numpy()
         self.lastYs.append([predY[0], predY[1], predY[2], predY[3]])
 
+        # началась новая игра
+        if person.hunger == 10 and self.lastHunger > 90:
+            self.lastHunger = person.hunger
+            self.lastXs = []
+            self.lastYs = []
+
         if self.lastHunger <= (person.hunger - 1.5) or self.lastHunger > person.hunger:
-            v = -1
+            v = -4.0 * (distance / 500.0)
             if self.lastHunger > person.hunger:
                 v = 4
+
+            if len(self.lastXs) > 100:
+                self.lastXs = self.lastXs[len(self.lastXs) - 100:len(self.lastXs)]
+                self.lastYs = self.lastYs[len(self.lastYs) - 100:len(self.lastYs)]
             rewards = self.discountCorrectRewards(v, len(self.lastYs), np.argmax(self.lastYs, axis=1))
             t = self.epochs
             print(f"Epoch {t + 1}\n-------------------------------")
@@ -132,9 +148,7 @@ class SpinalCordLearner(object):
 
         # Этап 1 - логарифмируем вероятности действий
         # prob = torch.log(pred[np.arange(len(y)), y])
-        print(pred)
         prob = torch.log(pred)
-        print(prob)
         # Этап 2 - отрицательное среднее произведения вероятностей на награду
         selected_probs = rewards * prob
         loss = -selected_probs.mean()
@@ -165,7 +179,8 @@ class SpinalCordLearner(object):
         correct /= size
         print(f"Test Error: \n Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
-    def discountCorrectRewards(self, v: float, count: int, indexes: [int], gamma=0.98) -> [float]:  # Дисконтированная награда
+    def discountCorrectRewards(self, v: float, count: int, indexes: [int], gamma=0.98) -> [
+        float]:  # Дисконтированная награда
         """ take 1D float array of rewards and compute discounted reward """
         vals = [0.0] * count
         running_add = v
