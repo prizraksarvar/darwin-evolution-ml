@@ -34,6 +34,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Фоновый воркер что то я подумал заморочки с мьютексами это через чур пока
         # self.runWorkerTask()
 
+        self.timerBackground = None
         if self.backgroundLoop is not None:
             self.timerBackground = QTimer()
             self.timerBackground.timeout.connect(self.backgroundLoop)
@@ -48,9 +49,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.keyReleaseEventHook(event)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
-        if event.key() == Qt.Key_0:
+        if event.key() == Qt.Key_Minus:
+            if self.timerBackground is None:
+                return
+            self.timerBackground.stop()
+            self.timerBackground.start(1000/60)
             pass
-        if event.key() == Qt.Key_1:
+        if event.key() == Qt.Key_Equal:
+            if self.timerBackground is None:
+                return
+            self.timerBackground.stop()
+            self.timerBackground.start(0)
             pass
         self.keyPressEventHook(event)
 

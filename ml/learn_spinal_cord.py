@@ -70,7 +70,8 @@ class SpinalCordLearner(object):
             rotateDirection,
             person.movementSpeed / 3,
             targetSpeed / 3,
-            distance / 500
+            distance / 500,
+            person.hunger / 100
         ]
         X = torch.Tensor(np.array(origX)).float()
         X = X.to(device)
@@ -97,29 +98,34 @@ class SpinalCordLearner(object):
         self.lastYs.append([predY[0], predY[1], predY[2], predY[3]])
 
         # началась новая игра
-        if person.hunger == 10 and self.lastHunger > 90:
-            self.lastHunger = person.hunger
-            self.lastXs = []
-            self.lastYs = []
+        # if person.hunger == 10 and self.lastHunger > 90:
+        #     self.lastHunger = person.hunger
+        #     self.lastXs = []
+        #     self.lastYs = []
 
-        if self.lastHunger <= (person.hunger - 1.5) or self.lastHunger > person.hunger:
+        #  or person.hunger > 99.9
+        if self.lastHunger > person.hunger:
             v = -4.0 * (distance / 500.0)
-            if self.lastHunger > person.hunger:
+            if self.lastHunger > person.hunger and not (person.hunger == 10 and self.lastHunger > 90):
                 v = 4
 
-            maxCount = 400
-            if len(self.lastXs) > maxCount:
-                self.lastXs = self.lastXs[len(self.lastXs) - maxCount:len(self.lastXs)]
-                self.lastYs = self.lastYs[len(self.lastYs) - maxCount:len(self.lastYs)]
-            rewards = self.discountCorrectRewards(v, len(self.lastYs), np.argmax(self.lastYs, axis=1))
-            t = self.epochs
-            print(f"Epoch {t + 1}\n-------------------------------")
-            self.train(rewards, self.model, self.loss_fn, self.optimizer)
-            # self.test(rewards, self.model, self.loss_fn)
-            self.epochs = self.epochs + 1
-            self.lastHunger = person.hunger
+            # maxCount = 400
+            # if len(self.lastXs) > maxCount:
+            #     self.lastXs = self.lastXs[len(self.lastXs) - maxCount:len(self.lastXs)]
+            #     self.lastYs = self.lastYs[len(self.lastYs) - maxCount:len(self.lastYs)]
+
+            # np.argmax(self.lastYs, axis=1)
+            rewards = self.discountCorrectRewards(v, self.lastYs)
+
+            if len(self.lastXs) > 1:
+                t = self.epochs
+                print(f"Epoch {t + 1}\n-------------------------------")
+                self.train(rewards, self.model, self.loss_fn, self.optimizer)
+                # self.test(rewards, self.model, self.loss_fn)
+                self.epochs = self.epochs + 1
             self.lastXs = []
             self.lastYs = []
+        self.lastHunger = person.hunger
 
     def done(self):
         print("Done!")
@@ -180,14 +186,21 @@ class SpinalCordLearner(object):
         correct /= size
         print(f"Test Error: \n Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
-    def discountCorrectRewards(self, v: float, count: int, indexes: [int], gamma=0.98) -> [
-        float]:  # Дисконтированная награда
+    def discountCorrectRewards(self, v: float, indexes: np.array, gamma=0.98) -> [float]:  # Дисконтированная награда
         """ take 1D float array of rewards and compute discounted reward """
+        count = len(indexes)
         vals = [0.0] * count
         running_add = v
         for t in reversed(range(count)):
             vt = [0, 0, 0, 0]
-            vt[indexes[t]] = running_add
+            i1 = 0
+            if indexes[t][0] < indexes[t][1]:
+                i1 = 1
+            i2 = 2
+            if indexes[t][2] < indexes[t][3]:
+                i2 = 3
+            vt[i1] = running_add
+            vt[i2] = running_add
             vals[t] = vt
             running_add = running_add * gamma
 
