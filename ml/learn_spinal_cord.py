@@ -107,9 +107,10 @@ class SpinalCordLearner(object):
             if self.lastHunger > person.hunger:
                 v = 4
 
-            if len(self.lastXs) > 100:
-                self.lastXs = self.lastXs[len(self.lastXs) - 100:len(self.lastXs)]
-                self.lastYs = self.lastYs[len(self.lastYs) - 100:len(self.lastYs)]
+            maxCount = 400
+            if len(self.lastXs) > maxCount:
+                self.lastXs = self.lastXs[len(self.lastXs) - maxCount:len(self.lastXs)]
+                self.lastYs = self.lastYs[len(self.lastYs) - maxCount:len(self.lastYs)]
             rewards = self.discountCorrectRewards(v, len(self.lastYs), np.argmax(self.lastYs, axis=1))
             t = self.epochs
             print(f"Epoch {t + 1}\n-------------------------------")
@@ -185,7 +186,7 @@ class SpinalCordLearner(object):
         vals = [0.0] * count
         running_add = v
         for t in reversed(range(count)):
-            vt = [1, 1, 1, 1]
+            vt = [0, 0, 0, 0]
             vt[indexes[t]] = running_add
             vals[t] = vt
             running_add = running_add * gamma
