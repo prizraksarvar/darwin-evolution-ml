@@ -61,6 +61,8 @@ class SpinalCordLearner(object):
         if angleDiff > 180:
             rotateDirection = 1
             angleDiff = 360 - angleDiff
+        if angleDiff == angleDiff:
+            rotateDirection = 0
 
         targetSpeed = 3
         if angleDiff >= 45:
@@ -74,8 +76,8 @@ class SpinalCordLearner(object):
             rotateDirection,
             person.movementSpeed / 3,
             targetSpeed / 3,
-            distance / 500,
-            person.hunger / 100
+            # distance / 500,
+            # person.hunger / 100
         ]
         X = torch.Tensor(np.array(origX)).float()
         X = X.to(device)
@@ -89,13 +91,13 @@ class SpinalCordLearner(object):
         self.controls[0].rotateRight = False
 
         mean = pred.mean()
-        if pred[0] > 0.45:  # and pred[1] < pred[0]:
+        if pred[0] > 0.5:  # and pred[1] < pred[0]:
             self.controls[0].moveForward = True
-        if pred[0] < 0.55:  # and pred[0] < pred[1]:
+        if pred[0] < 0.5:  # and pred[0] < pred[1]:
             self.controls[0].moveBack = True
-        if pred[1] < 0.45:  # and pred[3] < pred[2]:
+        if pred[1] < 0.5:  # and pred[3] < pred[2]:
             self.controls[0].rotateLeft = True
-        if pred[1] > 0.55:  # and pred[2] < pred[3]:
+        if pred[1] > 0.5:  # and pred[2] < pred[3]:
             self.controls[0].rotateRight = True
 
         self.lastXs.append(origX)
@@ -199,19 +201,19 @@ class SpinalCordLearner(object):
         for t in reversed(range(count)):
             vt = [0, 0]
             it = indexes[t]
-            if it[0] < 0.45:
-                vt[0] = running_add if running_add < 0 else -running_add
-            elif it[0] > 0.55:
-                vt[0] = running_add if running_add < 0 else -running_add
+            if it[0] < 0.5:
+                vt[0] = -running_add
+            elif it[0] > 0.5:
+                vt[0] = running_add
             else:
-                vt[0] = running_add # if random() > 0.5 else -running_add
+                vt[0] = running_add if random() > 0.5 else -running_add
 
-            if it[1] < 0.45:
-                vt[1] = running_add if running_add < 0 else -running_add
-            elif it[1] > 0.55:
-                vt[1] = running_add if running_add < 0 else -running_add
+            if it[1] < 0.5:
+                vt[1] = -running_add
+            elif it[1] > 0.5:
+                vt[1] = running_add
             else:
-                vt[1] = running_add # if random() > 0.5 else -running_add
+                vt[1] = running_add if random() > 0.5 else -running_add
 
             vals[t] = vt
             running_add = running_add * gamma

@@ -7,7 +7,7 @@ class SpinalCordNetwork(nn.Module):
         super(SpinalCordNetwork, self).__init__()
 
         # На вход подаем angle, targetAngle, rotateDirection, speed, targetSpeed, distance, hunger
-        self.layer1 = nn.Linear(7, 16)
+        self.layer1 = nn.Linear(5, 16)
         self.layer2 = nn.Linear(16, 24)
         self.layer3 = nn.Sequential(
             nn.Linear(24, 16),
