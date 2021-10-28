@@ -21,6 +21,7 @@ class SpinalCordLearner(object):
 
     lastXs: [float]
     lastYs: [float]
+    lastRewards: [float]
     lastHunger: float
 
     def __init__(self, environment: Environment, controls: [Control]):
@@ -29,18 +30,28 @@ class SpinalCordLearner(object):
 
         self.lastXs = []
         self.lastYs = []
+        self.lastRewards = []
         self.lastHunger = environment.persons[0].hunger
 
         self.model = SpinalCordNetwork().to(device)
         if os.path.isfile("spinal_cord_model.pth"):
             self.model.load_state_dict(torch.load("spinal_cord_model.pth"))
-        self.loss_fn = nn.L1Loss()
+        # self.loss_fn = nn.L1Loss()
+        self.loss_fn = nn.CrossEntropyLoss()
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
-        self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
-        # self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
+        # self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
 
         self.epochs = 0
         self.iter = 0
+
+        self.lastDistance = 0
+        self.lastExpPositive = True
+
+    def gameRestarted(self):
+        self.lastHunger = self.environment.persons[0].hunger
+        self.lastDistance = 0
+        self.lastExpPositive = True
 
     def learnLoop(self):
         person = self.environment.persons[0]
@@ -91,18 +102,36 @@ class SpinalCordLearner(object):
         self.controls[0].rotateRight = False
 
         mean = pred.mean()
-        if pred[0] > 0.5:  # and pred[1] < pred[0]:
+        if pred[0] > 0.5 and pred[1] < pred[0]:
             self.controls[0].moveForward = True
-        if pred[0] < 0.5:  # and pred[0] < pred[1]:
+        if pred[1] > 0.5 and pred[0] < pred[1]:
             self.controls[0].moveBack = True
-        if pred[1] < 0.5:  # and pred[3] < pred[2]:
+        if pred[2] > 0.5 and pred[3] < pred[2]:
             self.controls[0].rotateLeft = True
-        if pred[1] > 0.5:  # and pred[2] < pred[3]:
+        if pred[3] > 0.5 and pred[2] < pred[3]:
             self.controls[0].rotateRight = True
 
         self.lastXs.append(origX)
         predY = pred.detach().numpy()
-        self.lastYs.append([predY[0], predY[1]])
+        # if predY[0] < 0.1:
+        #     predY[0] = 0.1
+        # if predY[1] < 0.1:
+        #     predY[1] = 0.1
+        # if predY[2] < 0.1:
+        #     predY[2] = 0.1
+        # if predY[3] < 0.1:
+        #     predY[3] = 0.1
+        predY = [predY[0], predY[1], predY[2], predY[3]]
+        self.lastYs.append(predY)
+
+        v = -4.0 * (distance / 500.0)
+        expPositive = False
+        if self.lastDistance > distance:
+            v = 4 * ((500 - distance) / 500.0)
+            expPositive = True
+
+        rewards = self.discountCorrectRewards(v, predY)
+        self.lastRewards.append(rewards)
 
         # началась новая игра
         # if person.hunger == 10 and self.lastHunger > 90:
@@ -111,28 +140,18 @@ class SpinalCordLearner(object):
         #     self.lastYs = []
 
         #  or person.hunger > 99.9
-        if self.lastHunger > person.hunger:
-            v = -4.0 * (distance / 500.0)
-            if self.lastHunger > person.hunger and not (person.hunger == 10 and self.lastHunger > 90):
-                v = 4
-
-            # maxCount = 400
-            # if len(self.lastXs) > maxCount:
-            #     self.lastXs = self.lastXs[len(self.lastXs) - maxCount:len(self.lastXs)]
-            #     self.lastYs = self.lastYs[len(self.lastYs) - maxCount:len(self.lastYs)]
-
-            # np.argmax(self.lastYs, axis=1)
-            rewards = self.discountCorrectRewards(v, self.lastYs)
-
-            if len(self.lastXs) > 1:
-                t = self.epochs
-                print(f"Epoch {t + 1}\n-------------------------------")
-                self.train(rewards, self.model, self.loss_fn, self.optimizer)
-                # self.test(rewards, self.model, self.loss_fn)
-                self.epochs = self.epochs + 1
+        if len(self.lastXs) >= 1 and self.lastExpPositive != expPositive:
+            self.lastExpPositive = expPositive
+            t = self.epochs
+            print(f"Epoch {t + 1}\n-------------------------------")
+            self.train(self.lastRewards, self.model, self.loss_fn, self.optimizer)
+            # self.test(rewards, self.model, self.loss_fn)
+            self.epochs = self.epochs + 1
             self.lastXs = []
             self.lastYs = []
+            self.lastRewards = []
         self.lastHunger = person.hunger
+        self.lastDistance = distance
 
     def done(self):
         print("Done!")
@@ -167,6 +186,24 @@ class SpinalCordLearner(object):
         selected_probs = rewards * prob
         loss = -selected_probs.mean()
 
+        lossV = loss.item()
+        if math.isnan(lossV):
+            print("pred: ")
+            print(pred)
+            print("prob: ")
+            print(prob)
+            print("selected_probs: ")
+            print(selected_probs)
+            exit(1)
+
+        if math.isinf(lossV):
+            print("pred: ")
+            print(pred)
+            print("prob: ")
+            print(prob)
+            print("selected_probs: ")
+            print(selected_probs)
+
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
@@ -193,31 +230,28 @@ class SpinalCordLearner(object):
         correct /= size
         print(f"Test Error: \n Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
-    def discountCorrectRewards(self, v: float, indexes: np.array, gamma=0.98) -> [float]:  # Дисконтированная награда
+    def discountCorrectRewards(self, v: float, predY: [float], gamma=0.98) -> [float]:  # Дисконтированная награда
         """ take 1D float array of rewards and compute discounted reward """
-        count = len(indexes)
-        vals = [0.0] * count
         running_add = v
-        for t in reversed(range(count)):
-            vt = [0, 0]
-            it = indexes[t]
-            if it[0] < 0.5:
-                vt[0] = -running_add
-            elif it[0] > 0.5:
-                vt[0] = running_add
-            else:
-                vt[0] = running_add if random() > 0.5 else -running_add
 
-            if it[1] < 0.5:
-                vt[1] = -running_add
-            elif it[1] > 0.5:
-                vt[1] = running_add
-            else:
-                vt[1] = running_add if random() > 0.5 else -running_add
+        vt = [0, 0, 0, 0]
+        it = predY
+        if it[0] > 0.5:
+            vt[0] = running_add
+        else:
+            vt[0] = -running_add
+        if it[1] > 0.5:
+            vt[1] = running_add
+        else:
+            vt[1] = -running_add
 
-            vals[t] = vt
-            running_add = running_add * gamma
+        if it[2] > 0.5:
+            vt[2] = running_add
+        else:
+            vt[2] = -running_add
+        if it[3] > 0.5:
+            vt[3] = running_add
+        else:
+            vt[3] = -running_add
 
-        # discounted_r -= discounted_r.mean()
-        # discounted_r /- discounted_r.std()
-        return vals
+        return vt

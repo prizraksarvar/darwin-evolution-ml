@@ -16,13 +16,14 @@ class Application(object):
     controls: [Control]
     externalControl: bool
 
-    def __init__(self, environment: Environment, controls: [Control], loopFun, externalControl: bool):
+    def __init__(self, environment: Environment, controls: [Control], loopFun, restartedFun, externalControl: bool):
         print("Start")
 
         self.environment = environment
         self.controls = controls
         self.externalControl = externalControl
         self.loopFun = loopFun
+        self.restartedFun = restartedFun
 
         self.app = QtWidgets.QApplication(sys.argv)
         self.window = MainWindow(self.loop, self.backgroundLoop, self.keyPressEventHook, self.keyReleaseEventHook)
@@ -40,8 +41,9 @@ class Application(object):
         self.loopFun()
         self.environment.tickUpdate(self.controls)
         if self.environment.persons[0].hunger == 100:
-            # exit(0)
             self.environment.reinit()
+            if self.restartedFun is not None:
+                self.restartedFun()
         if self.environment.persons[0].hunger == 0:
             # exit(0)
             self.app.quitOnLastWindowClosed()
@@ -84,9 +86,9 @@ environment = Environment(400, 300, 1, 1)
 controls = [Control()]
 
 # Ручное управление
-# app = Application(environment, controls, None, False)
+# app = Application(environment, controls, None, None, False)
 
 # ML с обучением
 learner = SpinalCordLearner(environment, controls)
-app = Application(environment, controls, learner.learnLoop, True)
+app = Application(environment, controls, learner.learnLoop, learner.gameRestarted, True)
 learner.done()
