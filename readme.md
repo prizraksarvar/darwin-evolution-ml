@@ -18,3 +18,14 @@
 `-` - 60 FPS
 
 `=` - Столько сколько выжмет ваш комп
+
+
+# Другое
+
+### отключение диалога об ошибках в MacOS
+
+`defaults write com.apple.CrashReporter DialogType none`
+
+включить обратно
+
+`defaults write com.apple.CrashReporter DialogType prompt`
