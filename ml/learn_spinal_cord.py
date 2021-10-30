@@ -41,8 +41,8 @@ class SpinalCordLearner(object):
         self.loss_fn = nn.L1Loss()
         # self.loss_fn = nn.CrossEntropyLoss()
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
-        self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
-        # self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
+        # self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
 
         self.epochs = 0
         self.iter = 0
@@ -120,7 +120,7 @@ class SpinalCordLearner(object):
         predY = [predY[0], predY[1], predY[2], predY[3]]
         self.lastYs.append(predY)
 
-        learnSpeed = 0.5
+        learnSpeed = 0.1
         v = - learnSpeed * (distance / 500.0)
         expPositive = False
         if self.lastDistance > distance:
@@ -128,25 +128,25 @@ class SpinalCordLearner(object):
             expPositive = True
 
         v2 = - learnSpeed * (angleDiff / 180.0)
-        if self.angleDiff >= angleDiff:
-            v2 = + learnSpeed * ((180.0 - angleDiff) / 180.0)
+        if self.angleDiff > angleDiff or angleDiff == 0:
+            v2 = + learnSpeed * ((180 - angleDiff) / 180.0)
 
-        # Угол легко меняется если мы близко и двигаемся близко к цели
-        if distance < 50 and person.movementSpeed > 0.8:
-            v2 = 0
+        # Угол быстро меняется если мы близко к цели и двигаемся быстро, не зависимо от самого поворота
+        # if distance < 40 and person.movementSpeed > 0.8:
+        #     v2 = 0
 
         # Если у нас активировалось и влево и вправо одновремено то снижаем
-        if v2 > 0 and len(self.lastRewards) > 0 \
-                and self.lastRewards[len(self.lastRewards) - 1][2] > activationTreshold \
-                and self.lastRewards[len(self.lastRewards) - 1][3] > activationTreshold:
-            v2 = -v2
+        # if v2 > 0 and angleDiff > 3 and len(self.lastRewards) > 0 \
+        #         and self.lastRewards[len(self.lastRewards) - 1][2] > activationTreshold \
+        #         and self.lastRewards[len(self.lastRewards) - 1][3] > activationTreshold:
+        #     v2 = -v2
 
         rewards = self.discountCorrectRewards(v, v2, predY)
         if len(self.lastRewards) > 0:
             self.lastRewards[len(self.lastRewards) - 1] = rewards
         self.lastRewards.append(predY)
 
-        if len(self.lastXs) > 1 and self.lastExpPositive != expPositive:
+        if len(self.lastXs) > 1 and self.lastExpPositive != expPositive or len(self.lastXs) > 200:
             self.lastExpPositive = expPositive
             t = self.epochs
             print(f"Epoch {t + 1}\n-------------------------------")

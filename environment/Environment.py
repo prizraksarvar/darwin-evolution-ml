@@ -81,10 +81,10 @@ class Environment(object):
             # Далеко не идеальное решение
             if obj.movementAngle >= 180:
                 obj.movementAngle = obj.movementAngle - 180
-                obj.movementSpeed = 1.5
+                obj.movementSpeed = 0.1
             else:
                 obj.movementAngle = obj.movementAngle + 180
-                obj.movementSpeed = 1.5
+                obj.movementSpeed = 0.1
 
     def isWallCollisition(self, obj: EnvObject) -> bool:
         radius = obj.width / 2
