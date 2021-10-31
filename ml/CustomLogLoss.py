@@ -10,6 +10,8 @@ class CustomLogLoss(nn.Module):
     def forward(self, input: Tensor, target: Tensor) -> Tensor:
         # Этап 1 - логарифмируем вероятности действий
         # prob = torch.log(pred[np.arange(len(y)), y])
+
+        # если будет <= 0 тогда -inf
         prob = torch.log(input)
         # Этап 2 - отрицательное среднее произведения вероятностей на награду
         selected_probs = target * prob
