@@ -90,6 +90,6 @@ controls = [Control()]
 
 # ML с обучением
 learner = SpinalCordLearner(environment, controls)
-# app = Application(environment, controls, learner.learnLoop, learner.gameRestarted, True)
-app = Application(environment, controls, learner.testLoop, learner.gameRestarted, True)
+app = Application(environment, controls, learner.learnLoop, learner.gameRestarted, True)
+# app = Application(environment, controls, learner.testLoop, learner.gameRestarted, True)
 learner.done()
