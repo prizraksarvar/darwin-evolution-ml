@@ -9,14 +9,16 @@ from torch.utils.data import DataLoader
 
 from environment.Environment import Environment
 from environment.control import Control
+from game_score import GameScore
 from ml.CustomLogLoss import CustomLogLoss
 from ml.SpinalCordNetwork import SpinalCordNetwork
+from ml.learner_interface import LearnerInterface
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using {} device".format(device))
 
 
-class SpinalCordLearner(object):
+class SpinalCordLearner(LearnerInterface):
     environment: Environment
     controls: [Control]
 
@@ -25,7 +27,7 @@ class SpinalCordLearner(object):
     lastRewards: [float]
     lastHunger: float
 
-    def __init__(self, environment: Environment, controls: [Control]):
+    def __init__(self, environment: Environment, controls: [Control], scores: [GameScore]):
         self.environment = environment
         self.controls = controls
 
@@ -49,12 +51,14 @@ class SpinalCordLearner(object):
 
         self.lastDistance = 0
         self.angleDiff = 0
+        self.needSkipLearn = 0
         self.lastExpPositive = True
 
     def gameRestarted(self):
         self.lastHunger = self.environment.persons[0].hunger
         self.lastDistance = 0
         self.angleDiff = 0
+        self.needSkipLearn = 0
         self.lastExpPositive = True
 
     def learnLoop(self):
@@ -116,12 +120,10 @@ class SpinalCordLearner(object):
         if pred[3] > activationTreshold and pred[2] < pred[3]:
             self.controls[0].rotateRight = True
 
-        self.lastXs.append(origX)
         predY = pred.detach().numpy()
         predY = [predY[0], predY[1], predY[2], predY[3]]
-        self.lastYs.append(predY)
 
-        learnSpeed = 0.1
+        learnSpeed = 0.01
         v = - learnSpeed * (distance / 500.0)
         expPositive = False
         if self.lastDistance > distance:
@@ -145,10 +147,18 @@ class SpinalCordLearner(object):
         rewards = self.discountCorrectRewards(v, v2, predY)
         if len(self.lastRewards) > 0:
             self.lastRewards[len(self.lastRewards) - 1] = rewards
-        self.lastRewards.append(predY)
+
+        if self.needSkipLearn > 0:
+            self.needSkipLearn = self.needSkipLearn - 1
+        else:
+            self.lastXs.append(origX)
+            self.lastYs.append(predY)
+            self.lastRewards.append(predY)
 
         if len(self.lastXs) > 1 and self.lastExpPositive != expPositive or len(self.lastXs) > 200:
             self.lastExpPositive = expPositive
+            # Нужно пропустить несколько кадров
+            self.needSkipLearn = 50
             t = self.epochs
             print(f"Epoch {t + 1}\n-------------------------------")
             self.train(self.lastRewards, self.model, self.optimizer)
@@ -283,8 +293,8 @@ class SpinalCordLearner(object):
         # correct /= size
         # print(f"Test Error: \n Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
-    def discountCorrectRewards(self, v: float, v2: float, predY: [float], gamma=0.98) -> [
-        float]:  # Дисконтированная награда
+    # Дисконтированная награда
+    def discountCorrectRewards(self, v: float, v2: float, predY: [float], gamma=0.98) -> [float]:
         """ take 1D float array of rewards and compute discounted reward """
         running_add = self.calcRewardFunc(v)
         running_add_negative = 2 - running_add

@@ -5,6 +5,7 @@ from PyQt5.QtCore import Qt
 from MainWindow import MainWindow
 from environment.Environment import Environment
 from environment.control import Control
+from game_score import GameScore
 from ml.learn_spinal_cord import SpinalCordLearner
 
 
@@ -14,13 +15,15 @@ class Application(object):
 
     environment: Environment
     controls: [Control]
+    scores: [GameScore]
     externalControl: bool
 
-    def __init__(self, environment: Environment, controls: [Control], loopFun, restartedFun, externalControl: bool):
+    def __init__(self, environment: Environment, controls: [Control], scores: [GameScore], loopFun, restartedFun, externalControl: bool):
         print("Start")
 
         self.environment = environment
         self.controls = controls
+        self.scores = scores
         self.externalControl = externalControl
         self.loopFun = loopFun
         self.restartedFun = restartedFun
@@ -82,14 +85,15 @@ class Application(object):
         pass
 
 
-environment = Environment(400, 300, 1, 1)
+environment = Environment(400, 300, 1, 1, 30)
 controls = [Control()]
+scores = [GameScore()]
 
 # Ручное управление
 # app = Application(environment, controls, None, None, False)
 
 # ML с обучением
-learner = SpinalCordLearner(environment, controls)
-app = Application(environment, controls, learner.learnLoop, learner.gameRestarted, True)
+learner = SpinalCordLearner(environment, controls, scores)
+app = Application(environment, controls, scores, learner.learnLoop, learner.gameRestarted, True)
 # app = Application(environment, controls, learner.testLoop, learner.gameRestarted, True)
 learner.done()

@@ -12,14 +12,16 @@ class Environment(object):
     foods: [Food]
     persons: [Person]
     food_max_count: int
+    food_calories: float
     person_max_count: int
     max_x: float
     max_y: float
 
-    def __init__(self, max_x: float, max_y: float, food_max_count: int, person_max_count: int):
+    def __init__(self, max_x: float, max_y: float, food_max_count: int, person_max_count: int, food_calories: float):
         self.max_x = max_x
         self.max_y = max_y
         self.food_max_count = food_max_count
+        self.food_calories = food_calories
         self.person_max_count = person_max_count
         self.foods = [Food(0, 0, 0, 0)]*self.food_max_count
         self.persons = [Person(0, 0, 0, 0)]*self.person_max_count
@@ -31,7 +33,7 @@ class Environment(object):
     def reinit(self):
         for i in range(0, self.food_max_count):
             point = self.getRandCoords()
-            self.foods[i] = Food(point[0], point[1], 10, 30)
+            self.foods[i] = Food(point[0], point[1], 10, self.food_calories)
 
         for i in range(0, self.person_max_count):
             point = self.getRandCoords()
@@ -65,7 +67,7 @@ class Environment(object):
         for i in range(0, self.food_max_count):
             for j in range(0, self.person_max_count):
                 if self.isCollision(self.foods[i], self.persons[j]):
-                    self.persons[j].hunger = self.persons[j].hunger - self.foods[i].calories * 0.005
+                    self.persons[j].hunger = self.persons[j].hunger - self.foods[i].calories * 0.01
                     if self.persons[j].hunger < 0:
                         self.persons[j].hunger = 0
 
@@ -80,11 +82,11 @@ class Environment(object):
         if self.isWallCollisition(obj):
             # Далеко не идеальное решение
             if obj.movementAngle >= 180:
-                obj.movementAngle = obj.movementAngle - 180
-                obj.movementSpeed = 0.1
+                # obj.movementAngle = obj.movementAngle - 180
+                obj.movementSpeed = 0.0
             else:
-                obj.movementAngle = obj.movementAngle + 180
-                obj.movementSpeed = 0.1
+                # obj.movementAngle = obj.movementAngle + 180
+                obj.movementSpeed = 0.0
 
     def isWallCollisition(self, obj: EnvObject) -> bool:
         radius = obj.width / 2
