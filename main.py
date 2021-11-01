@@ -6,17 +6,19 @@ from MainWindow import MainWindow
 from environment.Environment import Environment
 from environment.control import Control
 from game_score import GameScore
+from game_statistic_window import GameStatisticWindow
 from ml.learn_spinal_cord import SpinalCordLearner
 
 
 class Application(object):
     app: QtWidgets.QApplication
     window: MainWindow
+    game_statistic_window: GameStatisticWindow
 
     environment: Environment
     controls: [Control]
     scores: [GameScore]
-    externalControl: bool
+    external_control: bool
 
     def __init__(self, environment: Environment, controls: [Control], scores: [GameScore], loopFun, restartedFun,
                  externalControl: bool):
@@ -25,22 +27,25 @@ class Application(object):
         self.environment = environment
         self.controls = controls
         self.scores = scores
-        self.externalControl = externalControl
+        self.external_control = externalControl
         self.loopFun = loopFun
         self.restartedFun = restartedFun
 
+        self.last_game_got_foods_count = [0]*len(self.environment.foods)
+
         self.app = QtWidgets.QApplication(sys.argv)
+        self.game_statistic_window = GameStatisticWindow()
         self.window = MainWindow(self.loop, self.backgroundLoop, self.keyPressEventHook, self.keyReleaseEventHook)
         self.app.exec_()
 
     def loop(self):
-        if not self.externalControl:
+        if not self.external_control:
             self.environment.tickUpdate(self.controls)
         self.window.draw(self.environment)
         pass
 
     def backgroundLoop(self):
-        if not self.externalControl:
+        if not self.external_control:
             return
         self.loopFun()
         last_person_hungers = [0.0]*len(self.environment.persons)
@@ -53,6 +58,8 @@ class Application(object):
                 self.environment.reinit()
                 if self.restartedFun is not None:
                     self.restartedFun()
+                self.game_statistic_window.draw(self.scores[idx].get_food_count - self.last_game_got_foods_count[idx])
+                self.last_game_got_foods_count[idx] = self.scores[idx].get_food_count
 
             if last_person_hungers[idx] != 100 and last_person_hungers[idx] > person.hunger:
                 self.scores[idx].get_food_count = self.scores[idx].get_food_count + 1
@@ -70,7 +77,7 @@ class Application(object):
         self.controls[0].rotateRight = False
 
     def keyPressEventHook(self, event: QtGui.QKeyEvent):
-        if self.externalControl:
+        if self.external_control:
             return
         if event.key() == Qt.Key_Up:
             self.controls[0].moveForward = True
@@ -83,7 +90,7 @@ class Application(object):
         pass
 
     def keyReleaseEventHook(self, event: QtGui.QKeyEvent):
-        if self.externalControl:
+        if self.external_control:
             return
         if event.key() == Qt.Key_Up:
             self.controls[0].moveForward = False
