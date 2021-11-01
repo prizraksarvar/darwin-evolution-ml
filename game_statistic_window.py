@@ -10,7 +10,6 @@ from matplotlib.figure import Figure
 from environment.Environment import Environment
 
 matplotlib.use('Qt5Agg')
-DIR = '/home/prizrak/Загрузки/'
 
 
 class MplCanvas(FigureCanvasQTAgg):
@@ -75,4 +74,4 @@ class GameStatisticWindow(QtWidgets.QMainWindow):
         self.repaint()
 
     def save(self):
-        self.canvas.figure.savefig(DIR + 'game_statistic.png')
+        self.canvas.figure.savefig('game_statistic.png')
