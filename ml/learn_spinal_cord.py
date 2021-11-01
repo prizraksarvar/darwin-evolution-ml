@@ -137,32 +137,23 @@ class SpinalCordLearner(LearnerInterface):
         if self.needSkipLearn > 0:
             self.needSkipLearn = self.needSkipLearn - 1
             # Почти не наказываем если ошибаться начал только что
-            v0 = v0 * 0.001
+            # v0 = v0 * 0.001
 
         v1 = v0
-
-        if targetSpeed < 0 and pred_y[1] <= activationTreshold and v1 < 0:
-            v1 = -v1
-        if targetSpeed > 0 and pred_y[1] > activationTreshold and v1 > 0:
-            v1 = -v1
-        if targetSpeed > 0 and pred_y[0] <= activationTreshold and v0 < 0:
-            v0 = -v0
-        if targetSpeed < 0 and pred_y[0] > activationTreshold and v0 > 0:
-            v0 = -v0
 
         v2 = - learnSpeed * (angleDiff / 180.0)
         if self.angleDiff > angleDiff or self.lastDistance == 0:
             v2 = + learnSpeed * ((180 - angleDiff) / 180.0)
 
         v3 = v2
-        if rotateDirection < 0 and pred_y[2] <= activationTreshold and v2 < 0:
-            v2 = -v2
-        if rotateDirection > 0 and pred_y[2] > activationTreshold and v2 > 0:
-            v2 = -v2
-        if rotateDirection > 0 and pred_y[3] <= activationTreshold and v3 < 0:
-            v3 = -v3
-        if rotateDirection < 0 and pred_y[3] > activationTreshold and v3 > 0:
-            v3 = -v3
+        # if rotateDirection < 0 and pred_y[2] <= activationTreshold and v2 < 0:
+        #     v2 = -v2
+        # if rotateDirection > 0 and pred_y[2] > activationTreshold and v2 > 0:
+        #     v2 = -v2
+        # if rotateDirection > 0 and pred_y[3] <= activationTreshold and v3 < 0:
+        #     v3 = -v3
+        # if rotateDirection < 0 and pred_y[3] > activationTreshold and v3 > 0:
+        #     v3 = -v3
 
         # Угол быстро меняется если мы близко к цели и двигаемся быстро, не зависимо от самого поворота
         # if distance < 40 and person.movementSpeed > 0.8:
@@ -190,7 +181,7 @@ class SpinalCordLearner(LearnerInterface):
         if len(self.lastXs) > 1000:
             self.lastExpPositive = expPositive
             # Нужно пропустить несколько кадров
-            self.needSkipLearn = 50
+            # self.needSkipLearn = 30
             t = self.epochs
             print(f"Epoch {t + 1}\n-------------------------------")
             self.train(self.lastRewards, self.model, self.optimizer)
@@ -334,20 +325,21 @@ class SpinalCordLearner(LearnerInterface):
         running_add = self.calcRewardFunc(v)
         running_add_negative = 2 - running_add
 
+        max_val = 0.60
+        min_val = 0.40
+
         vt = predY
         it = predY
         if it > 0.5:
             vt = it * running_add
         else:
-            vt = it * running_add_negative
+            vt = (it if it >= min_val else min_val) * running_add_negative
 
-        max = 0.95
-        if vt > max:
-            vt = max
+        if vt > max_val:
+            vt = max_val
 
-        min = 0.05
-        if vt < min:
-            vt = min
+        if vt < min_val:
+            vt = min_val
 
         return vt
 

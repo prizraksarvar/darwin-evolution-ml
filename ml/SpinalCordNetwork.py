@@ -10,9 +10,10 @@ class SpinalCordNetwork(nn.Module):
         # На вход подаем angle, targetAngle, rotateDirection, speed, targetSpeed, distance, hunger
         self.layer1 = nn.Sequential(
             nn.Linear(6, 18, bias=True),
-            nn.Linear(18, 18, bias=True),
+            nn.Linear(18, 40, bias=True),
+            nn.Tanh(),
             nn.Dropout(),
-            nn.Linear(18, 18, bias=True),
+            nn.Linear(40, 18, bias=True),
             # nn.Linear(18, 12, bias=True),
             nn.Linear(18, 4),
             # https://pytorch.org/docs/stable/generated/torch.nn.Softsign.html#torch.nn.Softsign

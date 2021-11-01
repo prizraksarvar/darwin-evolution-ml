@@ -37,8 +37,7 @@ class Environment(object):
 
     def reinit(self):
         for i in range(0, self.food_max_count):
-            point = self.getRandCoords()
-            self.foods[i] = Food(point[0], point[1], 10, self.food_calories)
+            self.foods[i] = self.getNewFood()
             self.foods_spawn_count = self.foods_spawn_count + 1
 
         for i in range(0, self.person_max_count):
@@ -78,8 +77,7 @@ class Environment(object):
                         self.persons[j].hunger = 0
 
                     # Перемещаем еду
-                    point = self.getRandCoords()
-                    self.foods[i] = Food(point[0], point[1], 10, 30)
+                    self.foods[i] = self.getNewFood()
                     self.foods_spawn_count = self.foods_spawn_count + 1
 
     def isCollision(self, obj1: EnvObject, obj2: EnvObject) -> bool:
@@ -149,6 +147,10 @@ class Environment(object):
         obj.hunger = obj.hunger + 0.002
         if obj.hunger > 100:
             obj.hunger = 100
+
+    def getNewFood(self):
+        point = self.getRandCoords()
+        return Food(point[0], point[1], 10, self.food_calories)
 
     def getRandCoords(self) -> [float, float]:
         return random() * (self.max_x - 60) + 30, random() * (self.max_y - 60) + 30

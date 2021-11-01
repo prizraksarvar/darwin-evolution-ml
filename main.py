@@ -5,6 +5,7 @@ from PyQt5.QtCore import Qt
 from MainWindow import MainWindow
 from environment.Environment import Environment
 from environment.control import Control
+from environment.left_right_environment import LeftRightEnvironment
 from game_score import GameScore
 from game_statistic_window import GameStatisticWindow
 from ml.learn_spinal_cord import SpinalCordLearner
@@ -103,7 +104,8 @@ class Application(object):
         pass
 
 
-environment1 = Environment(400, 300, 1, 1, 30, 94)
+# environment1 = Environment(400, 300, 1, 1, 30, 94)
+environment1 = LeftRightEnvironment(400, 300, 1, 1, 30, 94)
 controls1 = [Control()]
 scores1 = [GameScore()]
 
