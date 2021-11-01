@@ -14,17 +14,22 @@ class Environment(object):
     food_max_count: int
     food_calories: float
     person_max_count: int
+    person_hunger: float
     max_x: float
     max_y: float
+    foods_spawn_count: int
 
-    def __init__(self, max_x: float, max_y: float, food_max_count: int, person_max_count: int, food_calories: float):
+    def __init__(self, max_x: float, max_y: float, food_max_count: int, person_max_count: int, food_calories: float, person_hunger: float):
         self.max_x = max_x
         self.max_y = max_y
         self.food_max_count = food_max_count
         self.food_calories = food_calories
         self.person_max_count = person_max_count
+        self.person_hunger = person_hunger
         self.foods = [Food(0, 0, 0, 0)]*self.food_max_count
         self.persons = [Person(0, 0, 0, 0)]*self.person_max_count
+
+        self.foods_spawn_count = 0
 
         # Инициализируем генератор случайных чисел
         seed(version=2)
@@ -34,10 +39,11 @@ class Environment(object):
         for i in range(0, self.food_max_count):
             point = self.getRandCoords()
             self.foods[i] = Food(point[0], point[1], 10, self.food_calories)
+            self.foods_spawn_count = self.foods_spawn_count + 1
 
         for i in range(0, self.person_max_count):
             point = self.getRandCoords()
-            self.persons[i] = Person(point[0], point[1], 10, 10)
+            self.persons[i] = Person(point[0], point[1], 10, self.person_hunger)
 
     def tickUpdate(self, controls: [Control]):
         for i in range(0, self.food_max_count):
@@ -74,6 +80,7 @@ class Environment(object):
                     # Перемещаем еду
                     point = self.getRandCoords()
                     self.foods[i] = Food(point[0], point[1], 10, 30)
+                    self.foods_spawn_count = self.foods_spawn_count + 1
 
     def isCollision(self, obj1: EnvObject, obj2: EnvObject) -> bool:
         return cycle_interception(obj1.x, obj1.y, obj1.width / 2, obj2.x, obj2.y, obj2.width / 2)
@@ -90,23 +97,24 @@ class Environment(object):
 
     def isWallCollisition(self, obj: EnvObject) -> bool:
         radius = obj.width / 2
+        v = False
         if obj.x - radius <= 0:
             # TODO: костыль чтобы не проавливаться сквозь стены
             obj.x = 0 + radius
-            return True
+            v = True
         if obj.x + radius >= self.max_x:
             # TODO: костыль чтобы не проавливаться сквозь стены
             obj.x = self.max_x - radius
-            return True
+            v = True
         if obj.y - radius <= 0:
             # TODO: костыль чтобы не проавливаться сквозь стены
             obj.y = 0 + radius
-            return True
+            v = True
         if obj.y + radius >= self.max_y:
             # TODO: костыль чтобы не проавливаться сквозь стены
             obj.y = self.max_y - radius
-            return True
-        return False
+            v = True
+        return v
 
     # Здесь у меня возник небольшой внутренний спор,
     # выносить в EnvObject чтобы объект сам считал или все же среда считала?

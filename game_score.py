@@ -1,7 +1,7 @@
 class GameScore(object):
-    dieCount: int
-    getFoodCount: int
+    die_count: int
+    get_food_count: int
 
     def __init__(self):
-        dieCount = 0
-        getFoodCount = 0
+        self.die_count = 0
+        self.get_food_count = 0

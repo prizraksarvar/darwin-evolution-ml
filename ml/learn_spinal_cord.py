@@ -1,3 +1,4 @@
+import copy
 import math
 import os
 from random import random
@@ -17,10 +18,14 @@ from ml.learner_interface import LearnerInterface
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using {} device".format(device))
 
+activationTreshold = 0.5
+
 
 class SpinalCordLearner(LearnerInterface):
     environment: Environment
     controls: [Control]
+    scores: [GameScore]
+    last_score: [GameScore]
 
     lastXs: [float]
     lastYs: [float]
@@ -30,6 +35,8 @@ class SpinalCordLearner(LearnerInterface):
     def __init__(self, environment: Environment, controls: [Control], scores: [GameScore]):
         self.environment = environment
         self.controls = controls
+        self.scores = scores
+        self.last_score = copy.deepcopy(scores)
 
         self.lastXs = []
         self.lastYs = []
@@ -43,8 +50,8 @@ class SpinalCordLearner(LearnerInterface):
         self.loss_fn = nn.L1Loss()
         # self.loss_fn = nn.CrossEntropyLoss()
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
-        # self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
-        self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
+        # self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
 
         self.epochs = 0
         self.iter = 0
@@ -53,6 +60,7 @@ class SpinalCordLearner(LearnerInterface):
         self.angleDiff = 0
         self.needSkipLearn = 0
         self.lastExpPositive = True
+        self.testGameCount = 0
 
     def gameRestarted(self):
         self.lastHunger = self.environment.persons[0].hunger
@@ -60,10 +68,17 @@ class SpinalCordLearner(LearnerInterface):
         self.angleDiff = 0
         self.needSkipLearn = 0
         self.lastExpPositive = True
+        if self.testGameCount > 0:
+            self.testGameCount = self.testGameCount - 1
+            if self.testGameCount == 0:
+                print(f"Test scores: \n Dies: {self.scores[0].die_count - self.last_score[0].die_count}, "
+                      f"Got foods: {self.scores[0].get_food_count - self.last_score[0].get_food_count} \n")
 
     def learnLoop(self):
         person = self.environment.persons[0]
         food = self.environment.foods[0]
+
+        distance = math.sqrt((person.x - food.x) ** 2 + (person.y - food.y) ** 2)
 
         dX = person.x - food.x
         dY = person.y - food.y
@@ -84,12 +99,10 @@ class SpinalCordLearner(LearnerInterface):
             rotateDirection = 0
 
         targetSpeed = 3
-        if angleDiff >= 45:
+        if angleDiff >= 45 and distance > 100 or angleDiff >= 45 * (distance / 100):
             targetSpeed = -2
 
-        distance = math.sqrt((person.x - food.x) ** 2 + (person.y - food.y) ** 2)
-
-        origX = [
+        orig_x = [
             angleDiff,
             1 if rotateDirection > 0 else 0,
             1 if rotateDirection < 0 else 0,
@@ -99,40 +112,57 @@ class SpinalCordLearner(LearnerInterface):
             # distance / 500,
             # person.hunger / 100
         ]
-        X = torch.Tensor(np.array(origX)).float()
+        X = torch.Tensor(np.array(orig_x)).float()
         X = X.to(device)
 
+        if self.testGameCount > 0:
+            return self.test(X)
+
+        self.model.eval()
         # Compute prediction error
         pred = self.model(X)
 
-        self.controls[0].moveForward = False
-        self.controls[0].moveBack = False
-        self.controls[0].rotateLeft = False
-        self.controls[0].rotateRight = False
+        self.prediction_to_control(pred)
 
-        activationTreshold = 0.5
-        if pred[0] > activationTreshold and pred[1] < pred[0]:
-            self.controls[0].moveForward = True
-        if pred[1] > activationTreshold and pred[0] < pred[1]:
-            self.controls[0].moveBack = True
-        if pred[2] > activationTreshold and pred[3] < pred[2]:
-            self.controls[0].rotateLeft = True
-        if pred[3] > activationTreshold and pred[2] < pred[3]:
-            self.controls[0].rotateRight = True
+        pred_y = pred.detach().numpy()
+        pred_y = [pred_y[0], pred_y[1], pred_y[2], pred_y[3]]
 
-        predY = pred.detach().numpy()
-        predY = [predY[0], predY[1], predY[2], predY[3]]
-
-        learnSpeed = 0.01
-        v = - learnSpeed * (distance / 500.0)
+        learnSpeed = 0.5
+        v0 = - learnSpeed * (distance / 500.0)
         expPositive = False
-        if self.lastDistance > distance:
-            v = + learnSpeed * ((500.0 - distance) / 500.0)
+        if self.lastDistance > distance or self.lastDistance == 0:
+            v0 = + learnSpeed * ((500.0 - distance) / 500.0)
             expPositive = True
 
+        if self.needSkipLearn > 0:
+            self.needSkipLearn = self.needSkipLearn - 1
+            # Почти не наказываем если ошибаться начал только что
+            v0 = v0 * 0.001
+
+        v1 = v0
+
+        if targetSpeed < 0 and pred_y[1] <= activationTreshold and v1 < 0:
+            v1 = -v1
+        if targetSpeed > 0 and pred_y[1] > activationTreshold and v1 > 0:
+            v1 = -v1
+        if targetSpeed > 0 and pred_y[0] <= activationTreshold and v0 < 0:
+            v0 = -v0
+        if targetSpeed < 0 and pred_y[0] > activationTreshold and v0 > 0:
+            v0 = -v0
+
         v2 = - learnSpeed * (angleDiff / 180.0)
-        if self.angleDiff > angleDiff or angleDiff == 0:
+        if self.angleDiff > angleDiff or self.lastDistance == 0:
             v2 = + learnSpeed * ((180 - angleDiff) / 180.0)
+
+        v3 = v2
+        if rotateDirection < 0 and pred_y[2] <= activationTreshold and v2 < 0:
+            v2 = -v2
+        if rotateDirection > 0 and pred_y[2] > activationTreshold and v2 > 0:
+            v2 = -v2
+        if rotateDirection > 0 and pred_y[3] <= activationTreshold and v3 < 0:
+            v3 = -v3
+        if rotateDirection < 0 and pred_y[3] > activationTreshold and v3 > 0:
+            v3 = -v3
 
         # Угол быстро меняется если мы близко к цели и двигаемся быстро, не зависимо от самого поворота
         # if distance < 40 and person.movementSpeed > 0.8:
@@ -144,18 +174,20 @@ class SpinalCordLearner(LearnerInterface):
         #         and self.lastRewards[len(self.lastRewards) - 1][3] > activationTreshold:
         #     v2 = -v2
 
-        rewards = self.discountCorrectRewards(v, v2, predY)
+        rewards = [
+            self.get_corrected_y(v0, pred_y[0]),
+            self.get_corrected_y(v1, pred_y[1]),
+            self.get_corrected_y(v2, pred_y[2]),
+            self.get_corrected_y(v3, pred_y[3]),
+        ]
         if len(self.lastRewards) > 0:
             self.lastRewards[len(self.lastRewards) - 1] = rewards
 
-        if self.needSkipLearn > 0:
-            self.needSkipLearn = self.needSkipLearn - 1
-        else:
-            self.lastXs.append(origX)
-            self.lastYs.append(predY)
-            self.lastRewards.append(predY)
+        self.lastXs.append(orig_x)
+        self.lastYs.append(pred_y)
+        self.lastRewards.append(pred_y)
 
-        if len(self.lastXs) > 1 and self.lastExpPositive != expPositive or len(self.lastXs) > 200:
+        if len(self.lastXs) > 1000:
             self.lastExpPositive = expPositive
             # Нужно пропустить несколько кадров
             self.needSkipLearn = 50
@@ -167,6 +199,8 @@ class SpinalCordLearner(LearnerInterface):
             self.lastXs = []
             self.lastYs = []
             self.lastRewards = []
+            self.testGameCount = 3
+            self.last_score = copy.deepcopy(self.scores)
         self.lastHunger = person.hunger
         self.lastDistance = distance
         self.angleDiff = angleDiff
@@ -269,20 +303,7 @@ class SpinalCordLearner(LearnerInterface):
         with torch.no_grad():
             pred = self.model(X)
 
-            self.controls[0].moveForward = False
-            self.controls[0].moveBack = False
-            self.controls[0].rotateLeft = False
-            self.controls[0].rotateRight = False
-
-            activationTreshold = 0.5
-            if pred[0] > activationTreshold and pred[1] < pred[0]:
-                self.controls[0].moveForward = True
-            if pred[1] > activationTreshold and pred[0] < pred[1]:
-                self.controls[0].moveBack = True
-            if pred[2] > activationTreshold and pred[3] < pred[2]:
-                self.controls[0].rotateLeft = True
-            if pred[3] > activationTreshold and pred[2] < pred[3]:
-                self.controls[0].rotateRight = True
+            self.prediction_to_control(pred)
 
             # test_loss += self.loss_fn(pred, y).item()
             # n_digits = 3
@@ -293,54 +314,40 @@ class SpinalCordLearner(LearnerInterface):
         # correct /= size
         # print(f"Test Error: \n Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
+    def prediction_to_control(self, pred):
+        self.controls[0].moveForward = False
+        self.controls[0].moveBack = False
+        self.controls[0].rotateLeft = False
+        self.controls[0].rotateRight = False
+
+        if pred[0] > activationTreshold and pred[1] < pred[0]:
+            self.controls[0].moveForward = True
+        if pred[1] > activationTreshold and pred[0] < pred[1]:
+            self.controls[0].moveBack = True
+        if pred[2] > activationTreshold and pred[3] < pred[2]:
+            self.controls[0].rotateLeft = True
+        if pred[3] > activationTreshold and pred[2] < pred[3]:
+            self.controls[0].rotateRight = True
+
     # Дисконтированная награда
-    def discountCorrectRewards(self, v: float, v2: float, predY: [float], gamma=0.98) -> [float]:
-        """ take 1D float array of rewards and compute discounted reward """
+    def get_corrected_y(self, v: float, predY: float, gamma=0.98) -> float:
         running_add = self.calcRewardFunc(v)
         running_add_negative = 2 - running_add
 
-        running_add2 = self.calcRewardFunc(v2)
-        running_add_negative2 = 2 - running_add2
-
-        vt = [0, 0, 0, 0]
+        vt = predY
         it = predY
-        if it[0] > 0.5:
-            vt[0] = it[0] * running_add
+        if it > 0.5:
+            vt = it * running_add
         else:
-            vt[0] = it[0] * running_add_negative
-        if it[1] > 0.5:
-            vt[1] = it[1] * running_add
-        else:
-            vt[1] = it[1] * running_add_negative
-
-        if it[2] > 0.5:
-            vt[2] = it[2] * running_add2
-        else:
-            vt[2] = it[2] * running_add_negative2
-        if it[3] > 0.5:
-            vt[3] = it[3] * running_add2
-        else:
-            vt[3] = it[3] * running_add_negative2
+            vt = it * running_add_negative
 
         max = 0.95
-        if vt[0] > max:
-            vt[0] = max
-        if vt[1] > max:
-            vt[1] = max
-        if vt[2] > max:
-            vt[2] = max
-        if vt[3] > max:
-            vt[3] = max
+        if vt > max:
+            vt = max
 
         min = 0.05
-        if vt[0] < min:
-            vt[0] = min
-        if vt[1] < min:
-            vt[1] = min
-        if vt[2] < min:
-            vt[2] = min
-        if vt[3] < min:
-            vt[3] = min
+        if vt < min:
+            vt = min
 
         return vt
 

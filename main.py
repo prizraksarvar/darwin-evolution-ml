@@ -18,7 +18,8 @@ class Application(object):
     scores: [GameScore]
     externalControl: bool
 
-    def __init__(self, environment: Environment, controls: [Control], scores: [GameScore], loopFun, restartedFun, externalControl: bool):
+    def __init__(self, environment: Environment, controls: [Control], scores: [GameScore], loopFun, restartedFun,
+                 externalControl: bool):
         print("Start")
 
         self.environment = environment
@@ -42,15 +43,25 @@ class Application(object):
         if not self.externalControl:
             return
         self.loopFun()
+        last_person_hungers = [0.0]*len(self.environment.persons)
+        for idx, person in enumerate(self.environment.persons):
+            last_person_hungers[idx] = person.hunger
         self.environment.tickUpdate(self.controls)
-        if self.environment.persons[0].hunger == 100:
-            self.environment.reinit()
-            if self.restartedFun is not None:
-                self.restartedFun()
-        if self.environment.persons[0].hunger == 0:
-            # exit(0)
-            self.app.quitOnLastWindowClosed()
-            self.app.closeAllWindows()
+        for idx, person in enumerate(self.environment.persons):
+            if person.hunger == 100:
+                self.scores[idx].die_count = self.scores[idx].die_count + 1
+                self.environment.reinit()
+                if self.restartedFun is not None:
+                    self.restartedFun()
+
+            if last_person_hungers[idx] != 100 and last_person_hungers[idx] > person.hunger:
+                self.scores[idx].get_food_count = self.scores[idx].get_food_count + 1
+
+            if person.hunger == 0:
+                # TODO: доработать, тут убиваем игру если одна персона победила, возможно стоит дожидаться остальных
+                # exit(0)
+                self.app.quitOnLastWindowClosed()
+                self.app.closeAllWindows()
 
     def clearControl(self):
         self.controls[0].moveForward = False
@@ -85,15 +96,15 @@ class Application(object):
         pass
 
 
-environment = Environment(400, 300, 1, 1, 30)
-controls = [Control()]
-scores = [GameScore()]
+environment1 = Environment(400, 300, 1, 1, 30, 94)
+controls1 = [Control()]
+scores1 = [GameScore()]
 
 # Ручное управление
 # app = Application(environment, controls, None, None, False)
 
 # ML с обучением
-learner = SpinalCordLearner(environment, controls, scores)
-app = Application(environment, controls, scores, learner.learnLoop, learner.gameRestarted, True)
+learner = SpinalCordLearner(environment1, controls1, scores1)
+app = Application(environment1, controls1, scores1, learner.learnLoop, learner.gameRestarted, True)
 # app = Application(environment, controls, learner.testLoop, learner.gameRestarted, True)
 learner.done()
