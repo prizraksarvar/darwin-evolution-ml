@@ -12,9 +12,10 @@ DIR = '/home/prizrak/Загрузки/'
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, loop, backgroundLoop, keyPressEventHook, keyReleaseEventHook, *args, **kwargs):
+    def __init__(self, app, loop, backgroundLoop, keyPressEventHook, keyReleaseEventHook, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
 
+        self.app = app
         self.extLoop = loop
         self.backgroundLoop = backgroundLoop
         self.keyPressEventHook = keyPressEventHook
@@ -39,6 +40,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.timerBackground = QTimer()
             self.timerBackground.timeout.connect(self.backgroundLoop)
             self.timerBackground.start(0)
+
+    def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
+        self.app.quitOnLastWindowClosed()
+        self.app.closeAllWindows()
 
     def loop(self):
         self.extLoop()

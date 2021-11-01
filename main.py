@@ -34,8 +34,8 @@ class Application(object):
         self.last_game_got_foods_count = [0]*len(self.environment.foods)
 
         self.app = QtWidgets.QApplication(sys.argv)
-        self.game_statistic_window = GameStatisticWindow()
-        self.window = MainWindow(self.loop, self.backgroundLoop, self.keyPressEventHook, self.keyReleaseEventHook)
+        self.game_statistic_window = GameStatisticWindow(self.app)
+        self.window = MainWindow(self.app, self.loop, self.backgroundLoop, self.keyPressEventHook, self.keyReleaseEventHook)
         self.app.exec_()
 
     def loop(self):

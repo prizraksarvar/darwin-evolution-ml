@@ -22,9 +22,10 @@ class MplCanvas(FigureCanvasQTAgg):
 
 
 class GameStatisticWindow(QtWidgets.QMainWindow):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, app, *args, **kwargs):
         super(GameStatisticWindow, self).__init__(*args, **kwargs)
 
+        self.app = app
         sc = MplCanvas(self, width=10, height=10, dpi=100)
         self.canvas = sc
         self.setCentralWidget(sc)
@@ -49,6 +50,8 @@ class GameStatisticWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
         self.save()
+        self.app.quitOnLastWindowClosed()
+        self.app.closeAllWindows()
 
     def keyReleaseEvent(self, event: QtGui.QKeyEvent) -> None:
         super().keyReleaseEvent(event)
