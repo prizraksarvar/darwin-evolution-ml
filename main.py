@@ -8,6 +8,7 @@ from environment.control import Control
 from environment.left_right_environment import LeftRightEnvironment
 from game_score import GameScore
 from game_statistic_window import GameStatisticWindow
+from ml.learn_rotation_spinal_cord import RotationSpinalCordLearner
 from ml.learn_spinal_cord import SpinalCordLearner
 
 
@@ -59,7 +60,7 @@ class Application(object):
                 self.environment.reinit()
                 if self.restartedFun is not None:
                     self.restartedFun()
-                self.game_statistic_window.draw(self.scores[idx].get_food_count - self.last_game_got_foods_count[idx])
+                self.game_statistic_window.draw(self.scores[idx].get_food_count - self.last_game_got_foods_count[idx], self.scores[idx].loss)
                 self.last_game_got_foods_count[idx] = self.scores[idx].get_food_count
 
             if last_person_hungers[idx] != 100 and last_person_hungers[idx] > person.hunger:
@@ -113,7 +114,8 @@ scores1 = [GameScore()]
 # app = Application(environment, controls, None, None, False)
 
 # ML с обучением
-learner = SpinalCordLearner(environment1, controls1, scores1)
+# learner = SpinalCordLearner(environment1, controls1, scores1)
+learner = RotationSpinalCordLearner(environment1, controls1, scores1)
 app = Application(environment1, controls1, scores1, learner.learnLoop, learner.gameRestarted, True)
 # app = Application(environment, controls, learner.testLoop, learner.gameRestarted, True)
 learner.done()

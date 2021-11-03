@@ -1,5 +1,5 @@
 /venv/
 /.idea/
 __pycache__/
-spinal_cord_model.pth
+/spinal_cord_model.pth
 

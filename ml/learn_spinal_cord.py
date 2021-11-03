@@ -47,10 +47,11 @@ class SpinalCordLearner(LearnerInterface):
         if os.path.isfile("spinal_cord_model.pth"):
             self.model.load_state_dict(torch.load("spinal_cord_model.pth"))
         # self.loss_fn = CustomLogLoss()
-        self.loss_fn = nn.L1Loss()
+        # self.loss_fn = nn.L1Loss()
+        self.loss_fn = nn.MSELoss(reduction="sum")
         # self.loss_fn = nn.CrossEntropyLoss()
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
-        self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-4)
         # self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
 
         self.epochs = 0
@@ -73,6 +74,21 @@ class SpinalCordLearner(LearnerInterface):
             if self.testGameCount == 0:
                 print(f"Test scores: \n Dies: {self.scores[0].die_count - self.last_score[0].die_count}, "
                       f"Got foods: {self.scores[0].get_food_count - self.last_score[0].get_food_count} \n")
+            return
+
+        if len(self.lastXs) > 1000:
+            # Нужно пропустить несколько кадров
+            # self.needSkipLearn = 30
+            t = self.epochs
+            print(f"Epoch {t + 1}\n-------------------------------")
+            self.train(self.lastRewards, self.model, self.optimizer)
+            # self.test(rewards, self.model)
+            self.epochs = self.epochs + 1
+            self.lastXs = []
+            self.lastYs = []
+            self.lastRewards = []
+            self.testGameCount = 1
+            self.last_score = copy.deepcopy(self.scores)
 
     def learnLoop(self):
         person = self.environment.persons[0]
@@ -102,6 +118,9 @@ class SpinalCordLearner(LearnerInterface):
         if angleDiff >= 45 and distance > 100 or angleDiff >= 45 * (distance / 100):
             targetSpeed = -2
 
+        if targetSpeed > 0 and distance < 150:
+            targetSpeed = 2 * (distance / 150)
+
         orig_x = [
             angleDiff,
             1 if rotateDirection > 0 else 0,
@@ -109,7 +128,7 @@ class SpinalCordLearner(LearnerInterface):
             person.movementSpeed / 3,
             targetSpeed / 3 if targetSpeed > 0 else 0,
             -targetSpeed / 3 if targetSpeed < 0 else 0,
-            # distance / 500,
+            distance / 500,
             # person.hunger / 100
         ]
         X = torch.Tensor(np.array(orig_x)).float()
@@ -129,10 +148,8 @@ class SpinalCordLearner(LearnerInterface):
 
         learnSpeed = 0.5
         v0 = - learnSpeed * (distance / 500.0)
-        expPositive = False
-        if self.lastDistance > distance or self.lastDistance == 0:
+        if (self.lastDistance > distance or self.lastDistance == 0) and person.movementSpeed != 0:
             v0 = + learnSpeed * ((500.0 - distance) / 500.0)
-            expPositive = True
 
         if self.needSkipLearn > 0:
             self.needSkipLearn = self.needSkipLearn - 1
@@ -141,9 +158,11 @@ class SpinalCordLearner(LearnerInterface):
 
         v1 = v0
 
-        v2 = - learnSpeed * (angleDiff / 180.0)
+        v2 = - learnSpeed * ((angleDiff + 50.0) / (180.0 + 50.0))
         if self.angleDiff > angleDiff or self.lastDistance == 0:
-            v2 = + learnSpeed * ((180 - angleDiff) / 180.0)
+            v2 = + learnSpeed * ((angleDiff + 50.0) / (180.0 + 50.0))
+        if self.angleDiff == 0:
+            v2 = 0
 
         v3 = v2
         # if rotateDirection < 0 and pred_y[2] <= activationTreshold and v2 < 0:
@@ -171,6 +190,7 @@ class SpinalCordLearner(LearnerInterface):
             self.get_corrected_y(v2, pred_y[2]),
             self.get_corrected_y(v3, pred_y[3]),
         ]
+        # Награждаем пред шаг ибо его действия привели к текущему результату
         if len(self.lastRewards) > 0:
             self.lastRewards[len(self.lastRewards) - 1] = rewards
 
@@ -178,20 +198,6 @@ class SpinalCordLearner(LearnerInterface):
         self.lastYs.append(pred_y)
         self.lastRewards.append(pred_y)
 
-        if len(self.lastXs) > 1000:
-            self.lastExpPositive = expPositive
-            # Нужно пропустить несколько кадров
-            # self.needSkipLearn = 30
-            t = self.epochs
-            print(f"Epoch {t + 1}\n-------------------------------")
-            self.train(self.lastRewards, self.model, self.optimizer)
-            # self.test(rewards, self.model)
-            self.epochs = self.epochs + 1
-            self.lastXs = []
-            self.lastYs = []
-            self.lastRewards = []
-            self.testGameCount = 3
-            self.last_score = copy.deepcopy(self.scores)
         self.lastHunger = person.hunger
         self.lastDistance = distance
         self.angleDiff = angleDiff
@@ -252,7 +258,7 @@ class SpinalCordLearner(LearnerInterface):
         y = torch.Tensor(np.array(self.lastYs)).float()
         rewards = torch.Tensor(np.array(rewards)).float()
         X, y, rewards = X.to(device), y.to(device), rewards.to(device)
-        y_tmp = torch.Tensor(y).long().to(device)
+        # y_tmp = torch.Tensor(y).long().to(device)
 
         # Compute prediction error
         pred = model(X)

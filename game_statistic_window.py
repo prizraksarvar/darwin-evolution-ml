@@ -36,17 +36,24 @@ class GameStatisticWindow(QtWidgets.QMainWindow):
         self.canvas.axes.set_xlim(xmax=2000, xmin=0)
         self.canvas.axes.set_ylim(ymax=200, ymin=0)
 
-        self.plot_rf = self.canvas.axes.plot([], [], color='blue', label="Got foods count")[0]
+        self.plot_rf_food = self.canvas.axes.plot([], [], color='blue', label="Got foods count")[0]
+        self.plot_rf_loss = self.canvas.axes.plot([], [], color='red', label="Loss")[0]
         self.canvas.axes.legend()
 
         self.start_time = time.time()
         self.draw_count = 0
 
-        self.x_list = []
+        self.x_score_list = []
+        self.x_loss_list = []
         self.y_list = []
 
+        self.xmax = 1
+        self.ymax = 1
+        self.xmin = 0
+        self.ymin = 0
+
         self.show()
-        self.draw(0)
+        self.draw(0, 0)
 
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
         self.save()
@@ -63,13 +70,29 @@ class GameStatisticWindow(QtWidgets.QMainWindow):
         if event.key() == Qt.Key_Minus:
             pass
 
-    def draw(self, score: int):
+    def draw(self, score: int, loss: float):
         self.draw_count = self.draw_count + 1
 
         self.y_list.append(self.draw_count)
-        self.x_list.append(score)
+        self.x_score_list.append(score)
+        self.x_loss_list.append(loss)
 
-        self.plot_rf.set_data(self.y_list, self.x_list)
+        if self.ymax < score:
+            self.ymax = score
+        if self.ymax < int(loss):
+            self.ymax = int(loss)
+        if self.ymin > score:
+            self.ymin = score
+        if self.ymin > int(loss):
+            self.ymin = int(loss)
+
+        self.xmax = len(self.y_list) + 5
+
+        self.canvas.axes.set_xlim(xmax=self.xmax, xmin=self.xmin)
+        self.canvas.axes.set_ylim(ymax=self.ymax, ymin=self.ymin)
+
+        self.plot_rf_food.set_data(self.y_list, self.x_score_list)
+        self.plot_rf_loss.set_data(self.y_list, self.x_loss_list)
         exec_time = round(time.time() - self.start_time, 2)
         self.canvas.axes.set_title(f"Игра № {self.draw_count}\n--- {exec_time} seconds ---", fontsize=12)
 
