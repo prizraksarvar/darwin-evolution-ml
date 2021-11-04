@@ -17,7 +17,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.app = app
         self.extLoop = loop
-        self.backgroundLoop = backgroundLoop
+        self.extBackgroundLoop = backgroundLoop
         self.keyPressEventHook = keyPressEventHook
         self.keyReleaseEventHook = keyReleaseEventHook
         self.label = QtWidgets.QLabel()
@@ -31,21 +31,30 @@ class MainWindow(QtWidgets.QMainWindow):
         # 60 кадров в секунду
         self.timer.start(1000 / 60)
 
+        self.fps = 0
+        self.backFps = 0
+        self.drawFps = 0
+
         self.draw()
         # Фоновый воркер что то я подумал заморочки с мьютексами это через чур пока
         # self.runWorkerTask()
 
         self.timerBackground = None
-        if self.backgroundLoop is not None:
+        if self.extBackgroundLoop is not None:
             self.timerBackground = QTimer()
             self.timerBackground.timeout.connect(self.backgroundLoop)
             self.timerBackground.start(0)
+
+    def backgroundLoop(self):
+        self.backFps = self.backFps + 1
+        self.extBackgroundLoop()
 
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
         self.app.quitOnLastWindowClosed()
         self.app.closeAllWindows()
 
     def loop(self):
+        self.fps = self.fps + 1
         self.extLoop()
 
     def keyReleaseEvent(self, event: QtGui.QKeyEvent) -> None:
@@ -150,16 +159,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
         distance = sqrt((person.x - food.x) ** 2 + (person.y - food.y) ** 2)
 
-        painter.drawText(300, 15, "Distance: {0:.2f}".format(distance))
-        painter.drawText(300, 25, "Angle Dif: {0:.2f}".format(angleDiff))
-        painter.drawText(300, 35, "Angle: {0:.2f}".format(targetAngle))
-        painter.drawText(300, 45, "Direction: {0:.2f}".format(rotateDirection))
+        painter.drawText(300, 15, "FPS: {0:.2f}".format(self.drawFps))
+        painter.drawText(300, 25, "Distance: {0:.2f}".format(distance))
+        painter.drawText(300, 35, "Angle Dif: {0:.2f}".format(angleDiff))
+        painter.drawText(300, 45, "Angle: {0:.2f}".format(targetAngle))
+        painter.drawText(300, 55, "Direction: {0:.2f}".format(rotateDirection))
 
         angle = targetAngle
         radius = distance
         x = radius * sin(pi * 2 * angle / 360) + person.x
         y = radius * cos(pi * 2 * angle / 360) + person.y
         painter.drawLine(x, y, person.x, person.y)
+
+        if self.fps >= 60:
+            self.drawFps = self.backFps
+            self.fps = 0
+            self.backFps = 0
 
     def runWorkerTask(self):
         if self.backgroundLoop is None:

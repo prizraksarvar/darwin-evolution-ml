@@ -1,20 +1,17 @@
 import copy
 import math
 import os
-from random import random
 
 import numpy
 import numpy as np
 import torch
 from torch import nn, Tensor
-from torch.utils.data import DataLoader
 
 from environment.Environment import Environment
 from environment.control import Control
 from game_score import GameScore
-from ml.CustomLogLoss import CustomLogLoss
 from ml.RotationSpinalCordNetwork import RotationSpinalCordNetwork
-from ml.SpinalCordNetwork import SpinalCordNetwork
+from ml.base_learner import BaseLearner
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using {} device".format(device))
@@ -24,7 +21,7 @@ modelFileName = 'rotation_spinal_cord_model.pth'
 activationTreshold = 0.5
 
 
-class RotationSpinalCordLearner(object):
+class RotationSpinalCordBaseLearner(BaseLearner):
     environment: Environment
     controls: [Control]
     scores: [GameScore]
@@ -50,17 +47,18 @@ class RotationSpinalCordLearner(object):
         if os.path.isfile(modelFileName):
             self.model.load_state_dict(torch.load(modelFileName))
         # self.loss_fn = CustomLogLoss()
-        # self.loss_fn = nn.L1Loss()
+        self.loss_fn = nn.L1Loss()
+        # self.loss_fn = nn.MSELoss()
         # self.loss_fn = nn.MSELoss(reduction="sum")
-        self.loss_fn = nn.CrossEntropyLoss()
+        # self.loss_fn = nn.CrossEntropyLoss()
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
-        self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-5)
+        self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
         # self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
 
         self.custom_lay_counter = 1
         self.activation_heatmap = []
 
-        self.model.register_forward_hook(self.get_activation())
+        # self.model.register_forward_hook(self.get_activation())
 
         self.epochs = 0
         self.iter = 0
@@ -111,13 +109,12 @@ class RotationSpinalCordLearner(object):
         if angleDiff > 180:
             rotateDirection = 1
             angleDiff = 360 - angleDiff
-        if angleDiff == angleDiff:
+        if angleDiff == 0:
             rotateDirection = 0
 
         orig_x = [
-            angleDiff,
-            1 if rotateDirection > 0 else 0,
-            1 if rotateDirection < 0 else 0,
+            self.normilizeAngleDiff(angleDiff) if rotateDirection < 0 else 0.0,
+            self.normilizeAngleDiff(angleDiff) if rotateDirection > 0 else 0.0,
         ]
         X = torch.Tensor(np.array(orig_x)).float()
         X = X.to(device)
@@ -135,24 +132,23 @@ class RotationSpinalCordLearner(object):
         pred_y = [pred_y[0], pred_y[1]]
 
         learnSpeed = 0.5
-        v2 = - learnSpeed  # * ((angleDiff + 50.0) / (180.0 + 50.0))
+        v2 = - learnSpeed * self.normilizeAngleDiff(angleDiff)
         if self.angleDiff > angleDiff:
-            v2 = + learnSpeed  # * ((angleDiff + 50.0) / (180.0 + 50.0))
+            v2 = + learnSpeed * self.normilizeAngleDiff(angleDiff)
         if self.angleDiff == 0:
             v2 = 0
 
         v3 = v2
 
+        last_pred_y = pred_y
+        if len(self.lastYs) > 0:
+            last_pred_y = self.lastYs[len(self.lastYs) - 1]
+
         rewards = [
-            self.get_corrected_y(v2, pred_y[0]),
-            self.get_corrected_y(v3, pred_y[1]),
+            self.get_corrected_y(v2, last_pred_y[0]),
+            self.get_corrected_y(v3, last_pred_y[1]),
         ]
 
-        # rewards = [
-        #     1 if v2 > 0 else 0,
-        #     1 if v3 > 0 else 0,
-        # ]
-        # Награждаем пред шаг ибо его действия привели к текущему результату
         if len(self.lastRewards) > 0:
             self.lastRewards[len(self.lastRewards) - 1] = rewards
 
@@ -177,9 +173,8 @@ class RotationSpinalCordLearner(object):
         model.train()
 
         X = torch.Tensor(np.array(self.lastXs)).float()
-        y = torch.Tensor(np.array(self.lastYs)).float()
         rewards = torch.Tensor(np.array(rewards)).float()
-        X, y, rewards = X.to(device), y.to(device), rewards.to(device)
+        X, rewards = X.to(device), rewards.to(device)
         # y_tmp = torch.Tensor(y).long().to(device)
 
         # Compute prediction error
@@ -187,54 +182,28 @@ class RotationSpinalCordLearner(object):
 
         loss = self.loss_fn(pred, rewards)
 
-        lossV = loss.item()
-        if math.isnan(lossV):
-            print("pred: ")
-            print(pred)
-            # print("prob: ")
-            # print(prob)
-            # print("selected_probs: ")
-            # print(selected_probs)
-            exit(1)
-
-        if math.isinf(lossV):
-            print("pred: ")
-            print(pred)
-            # print("prob: ")
-            # print(prob)
-            # print("selected_probs: ")
-            # print(selected_probs)
-
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
+        predX = X.detach().numpy().mean(axis=0)
         predY = pred.detach().numpy().mean(axis=0)
         rewardY = rewards.detach().numpy().mean(axis=0)
         lossV = loss.item()
         self.scores[0].loss = lossV
         print(
             f"loss: {lossV:>7f}  [{size:>5d}]\n"
+            f"last input: [{predX[0]}, {predX[1]}]\n"
             f"last prediction: [{predY[0]}, {predY[1]}]\n"
-            f"last reward: [{rewardY[0]}, {rewardY[1]}]")
+            f"last reward: [{rewardY[0]}, {rewardY[1]}]"
+        )
 
     def test(self, X):
         self.model.eval()
-        test_loss, correct = 0, 0
         with torch.no_grad():
             pred = self.model(X)
-
             self.prediction_to_control(pred)
-
-            # test_loss += self.loss_fn(pred, y).item()
-            # n_digits = 3
-            # roundedPred = torch.round(pred * 10 ** n_digits) / (10 ** n_digits)
-            # roundedY = torch.round(y * 10 ** n_digits) / (10 ** n_digits)
-            # correct += (roundedPred.argmax(1) == roundedY).type(torch.float).sum().item()
-        # test_loss /= num_batches
-        # correct /= size
-        # print(f"Test Error: \n Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
     def prediction_to_control(self, pred):
         self.controls[0].moveForward = True
@@ -242,36 +211,14 @@ class RotationSpinalCordLearner(object):
         self.controls[0].rotateLeft = False
         self.controls[0].rotateRight = False
 
-        if pred[0] > pred[1]:
+        if pred[0] > activationTreshold and pred[0] > pred[1]:
             self.controls[0].rotateLeft = True
-        if pred[1] > pred[0]:
+        if pred[1] > activationTreshold and pred[1] > pred[0]:
             self.controls[0].rotateRight = True
 
-    # Дисконтированная награда
-    def get_corrected_y(self, v: float, predY: float, gamma=0.98) -> float:
-        running_add = self.calcRewardFunc(v)
-        running_add_negative = 2 - running_add
-
-        max_val = 0.60
-        min_val = 0.40
-
-        vt = predY
-        it = predY
-        if it > 0.5:
-            vt = it * running_add
-        else:
-            vt = (it if it >= min_val else min_val) * running_add_negative
-
-        if vt > max_val:
-            vt = max_val
-
-        if vt < min_val:
-            vt = min_val
-
-        return vt
-
-    def calcRewardFunc(self, v: float) -> float:
-        return 1.0 + v
+    def normilizeAngleDiff(self, angleDiff: float) -> float:
+        padding = 80.0
+        return (angleDiff + padding) / (180.0 + padding)
 
     def get_activation(self):
         def hook(model: nn.Module, input: Tensor, output: Tensor):
@@ -282,7 +229,7 @@ class RotationSpinalCordLearner(object):
                 self.custom_lay_counter = self.custom_lay_counter + 1
             o = output.detach().numpy()[0]
             if self.activation_heatmap[model.custom_lay_number] is None:
-                self.activation_heatmap[model.custom_lay_number] = numpy.array([0.0]*len(o))
+                self.activation_heatmap[model.custom_lay_number] = numpy.array([0.0] * len(o))
             v = self.activation_heatmap[model.custom_lay_number]
             v = v + o
 

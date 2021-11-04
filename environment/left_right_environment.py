@@ -27,6 +27,7 @@ class LeftRightEnvironment(Environment):
         ox = 0
         oy = 0
 
+        side = False
         n = 10
         while n > 0:
             # TODO: сделал просто while ибо так быстрее было чем придумывать формулу расчета координат
@@ -34,13 +35,15 @@ class LeftRightEnvironment(Environment):
             point = self.getRandCoords()
             ox = point[0]
             oy = point[1]
-            leftSide = ((person.x - x2) * (oy - y2) - (person.y - y2) * (ox - x2)) > 0
-            if self.left_count <= self.right_count and leftSide:
-                self.left_count = self.left_count + 1
+            side = ((person.x - x2) * (oy - y2) - (person.y - y2) * (ox - x2))
+            if self.left_count <= self.right_count and side > 0:
                 break
-            if self.left_count > self.right_count and not leftSide:
-                self.right_count = self.right_count + 1
+            if self.left_count > self.right_count and side < 0:
                 break
+        if side > 0:
+            self.left_count = self.left_count + 1
+        elif side < 0:
+            self.right_count = self.right_count + 1
         return Food(ox, oy, 10, self.food_calories)
 
     def getRandCoords(self) -> [float, float]:

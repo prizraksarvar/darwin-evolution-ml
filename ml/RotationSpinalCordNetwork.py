@@ -8,12 +8,12 @@ class RotationSpinalCordNetwork(nn.Module):
 
         # На вход подаем angleDiff, toLeft(0/1), toRight(0/1)
         self.layer1 = nn.Sequential(
-            nn.Linear(3, 6, bias=True),
+            nn.Linear(2, 2, bias=True),
+            nn.Linear(2, 2, bias=True),
             nn.Dropout(),
-            nn.Linear(6, 6, bias=True),
-            # nn.Tanh(),
-            nn.Linear(6, 6),
-            nn.Linear(6, 2),
+            nn.Tanh(),
+            # nn.Linear(2, 2, bias=True),
+            nn.Linear(2, 2),
             # https://pytorch.org/docs/stable/generated/torch.nn.Softsign.html#torch.nn.Softsign
             # от -2 до + бесконечности
             nn.SELU(),

@@ -13,7 +13,7 @@ from environment.control import Control
 from game_score import GameScore
 from ml.CustomLogLoss import CustomLogLoss
 from ml.SpinalCordNetwork import SpinalCordNetwork
-from ml.learner_interface import LearnerInterface
+from ml.base_learner import BaseLearner
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Using {} device".format(device))
@@ -21,7 +21,7 @@ print("Using {} device".format(device))
 activationTreshold = 0.5
 
 
-class SpinalCordLearner(LearnerInterface):
+class SpinalCordBaseLearner(BaseLearner):
     environment: Environment
     controls: [Control]
     scores: [GameScore]
@@ -48,7 +48,8 @@ class SpinalCordLearner(LearnerInterface):
             self.model.load_state_dict(torch.load("spinal_cord_model.pth"))
         # self.loss_fn = CustomLogLoss()
         # self.loss_fn = nn.L1Loss()
-        self.loss_fn = nn.MSELoss(reduction="sum")
+        self.loss_fn = nn.MSELoss()
+        # self.loss_fn = nn.MSELoss(reduction="sum")
         # self.loss_fn = nn.CrossEntropyLoss()
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
         self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-4)
@@ -111,7 +112,7 @@ class SpinalCordLearner(LearnerInterface):
         if angleDiff > 180:
             rotateDirection = 1
             angleDiff = 360 - angleDiff
-        if angleDiff == angleDiff:
+        if angleDiff == 0:
             rotateDirection = 0
 
         targetSpeed = 3
@@ -122,9 +123,9 @@ class SpinalCordLearner(LearnerInterface):
             targetSpeed = 2 * (distance / 150)
 
         orig_x = [
-            angleDiff,
-            1 if rotateDirection > 0 else 0,
-            1 if rotateDirection < 0 else 0,
+            # angleDiff,
+            angleDiff / 180 if rotateDirection < 0 else 0,
+            angleDiff / 180 if rotateDirection > 0 else 0,
             person.movementSpeed / 3,
             targetSpeed / 3 if targetSpeed > 0 else 0,
             -targetSpeed / 3 if targetSpeed < 0 else 0,
@@ -158,38 +159,16 @@ class SpinalCordLearner(LearnerInterface):
 
         v1 = v0
 
-        v2 = - learnSpeed * ((angleDiff + 50.0) / (180.0 + 50.0))
-        if self.angleDiff > angleDiff or self.lastDistance == 0:
-            v2 = + learnSpeed * ((angleDiff + 50.0) / (180.0 + 50.0))
-        if self.angleDiff == 0:
-            v2 = 0
-
-        v3 = v2
-        # if rotateDirection < 0 and pred_y[2] <= activationTreshold and v2 < 0:
-        #     v2 = -v2
-        # if rotateDirection > 0 and pred_y[2] > activationTreshold and v2 > 0:
-        #     v2 = -v2
-        # if rotateDirection > 0 and pred_y[3] <= activationTreshold and v3 < 0:
-        #     v3 = -v3
-        # if rotateDirection < 0 and pred_y[3] > activationTreshold and v3 > 0:
-        #     v3 = -v3
-
-        # Угол быстро меняется если мы близко к цели и двигаемся быстро, не зависимо от самого поворота
-        # if distance < 40 and person.movementSpeed > 0.8:
-        #     v2 = 0
-
-        # Если у нас активировалось и влево и вправо одновремено то снижаем
-        # if v2 > 0 and angleDiff > 3 and len(self.lastRewards) > 0 \
-        #         and self.lastRewards[len(self.lastRewards) - 1][2] > activationTreshold \
-        #         and self.lastRewards[len(self.lastRewards) - 1][3] > activationTreshold:
-        #     v2 = -v2
+        # Получаем пред шаг ибо его действия привели к текущему результату
+        last_pred_y = pred_y
+        if len(self.lastYs) > 0:
+            last_pred_y = self.lastYs[len(self.lastYs) - 1]
 
         rewards = [
-            self.get_corrected_y(v0, pred_y[0]),
-            self.get_corrected_y(v1, pred_y[1]),
-            self.get_corrected_y(v2, pred_y[2]),
-            self.get_corrected_y(v3, pred_y[3]),
+            self.get_corrected_y(v0, last_pred_y[0]),
+            self.get_corrected_y(v1, last_pred_y[1]),
         ]
+
         # Награждаем пред шаг ибо его действия привели к текущему результату
         if len(self.lastRewards) > 0:
             self.lastRewards[len(self.lastRewards) - 1] = rewards
@@ -225,15 +204,13 @@ class SpinalCordLearner(LearnerInterface):
             rotateDirection = 0
 
         targetSpeed = 3
-        if angleDiff >= 45:
+        if angleDiff >= 90:
             targetSpeed = -2
 
         distance = math.sqrt((person.x - food.x) ** 2 + (person.y - food.y) ** 2)
 
         origX = [
             angleDiff,
-            1 if rotateDirection > 0 else 0,
-            1 if rotateDirection < 0 else 0,
             person.movementSpeed / 3,
             targetSpeed / 3 if targetSpeed > 0 else 0,
             -targetSpeed / 3 if targetSpeed < 0 else 0,
@@ -325,29 +302,3 @@ class SpinalCordLearner(LearnerInterface):
             self.controls[0].rotateLeft = True
         if pred[3] > activationTreshold and pred[2] < pred[3]:
             self.controls[0].rotateRight = True
-
-    # Дисконтированная награда
-    def get_corrected_y(self, v: float, predY: float, gamma=0.98) -> float:
-        running_add = self.calcRewardFunc(v)
-        running_add_negative = 2 - running_add
-
-        max_val = 0.60
-        min_val = 0.40
-
-        vt = predY
-        it = predY
-        if it > 0.5:
-            vt = it * running_add
-        else:
-            vt = (it if it >= min_val else min_val) * running_add_negative
-
-        if vt > max_val:
-            vt = max_val
-
-        if vt < min_val:
-            vt = min_val
-
-        return vt
-
-    def calcRewardFunc(self, v: float) -> float:
-        return 1.0 + v
