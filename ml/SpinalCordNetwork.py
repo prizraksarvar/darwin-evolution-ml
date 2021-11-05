@@ -10,7 +10,7 @@ class SpinalCordNetwork(nn.Module):
         # На вход подаем angle, targetAngle, rotateDirection, speed, targetSpeed, distance, hunger
         self.layer1 = nn.Sequential(
             nn.Linear(3, 3),
-            # nn.Linear(3, 3),
+            nn.Linear(3, 3),
             # nn.Dropout(),
             # nn.Tanh(),
             # nn.Linear(3, 3),

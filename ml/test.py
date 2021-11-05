@@ -34,6 +34,24 @@ class TestEdit(object):
         self.rotation_model.eval()
         print(self.rotation_model.state_dict())
 
+        i = 0
+        for p in self.rotation_model.parameters():
+            if i == 5:
+                p.data[0] = 0.2797
+                p.data[1] = -0.095
+            print(p.data)
+            i = i + 1
+
+        Xs = []
+        for v in np.arange(80.0, 90.0, 0.5):
+            Xs.append([v / 180, 0])
+            Xs.append([0, v / 180])
+
+        for X in Xs:
+            X = torch.Tensor(np.array(X)).float().to(device)
+            pred = self.rotation_model(X)
+            print(pred)
+
     def done(self):
         print("Done!")
 
@@ -42,3 +60,4 @@ class TestEdit(object):
 
 
 t = TestEdit()
+t.done()

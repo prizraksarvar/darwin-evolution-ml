@@ -47,12 +47,12 @@ class RotationSpinalCordLearner(BaseLearner):
         if os.path.isfile(modelFileName):
             self.model.load_state_dict(torch.load(modelFileName))
         # self.loss_fn = CustomLogLoss()
-        self.loss_fn = nn.L1Loss()
-        # self.loss_fn = nn.MSELoss()
+        # self.loss_fn = nn.L1Loss()
+        self.loss_fn = nn.MSELoss()
         # self.loss_fn = nn.MSELoss(reduction="sum")
         # self.loss_fn = nn.CrossEntropyLoss()
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
-        self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adamax(self.model.parameters(), lr=1e-4)
         # self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=1e-3)
 
         self.custom_lay_counter = 1
@@ -133,9 +133,9 @@ class RotationSpinalCordLearner(BaseLearner):
 
         learnSpeed = 0.5
         v2 = - learnSpeed * self.normilize_angle_diff(angleDiff)
-        if self.angleDiff > angleDiff:
+        if self.angleDiff > angleDiff:  # and angleDiff < 180.0 - 3.0:
             v2 = + learnSpeed * self.normilize_angle_diff(angleDiff)
-        if self.angleDiff == 0:
+        if self.angleDiff == 0 and angleDiff == 0:
             v2 = 0
 
         v3 = v2

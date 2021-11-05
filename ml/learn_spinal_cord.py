@@ -46,7 +46,7 @@ class SpinalCordLearner(BaseLearner):
         self.lastRewards = []
         self.last_hunger = environment.persons[0].hunger
 
-        rotation_model_path = "models/rotation_spinal_cord_model.pth"
+        rotation_model_path = "models/rotation_spinal_cord_model2.pth"
         self.rotation_model = RotationSpinalCordNetwork().to(device)
         if not os.path.isfile(rotation_model_path):
             print(f"FATAL: model not found {rotation_model_path}")
@@ -131,16 +131,16 @@ class SpinalCordLearner(BaseLearner):
             rotate_direction = 0
 
         target_speed = 3
-        if angle_diff >= 45 and distance > 100 or angle_diff >= 45 * (distance / 100):
-            target_speed = -2
+        # if angle_diff >= 45 and distance > 100 or angle_diff >= 45 * (distance / 100):
+        #     target_speed = -2
 
         if target_speed > 0 and distance < 150:
             target_speed = 2 * ((distance + 50) / (150 + 50))
 
         orig_x = [
-            self.normilize_target_speed(target_speed) if target_speed > 0 else 0,
-            self.normilize_target_speed(-target_speed) if target_speed < 0 else 0,
+            self.normilize_angle_diff(angle_diff),
             person.movementSpeed / 3,
+            target_speed / 3
         ]
         X = torch.Tensor(np.array(orig_x)).float()
         X = X.to(device)
@@ -172,10 +172,9 @@ class SpinalCordLearner(BaseLearner):
         ab_target_speed = math.fabs(target_speed)
 
         learn_speed = 0.5
-        v0 = - learn_speed * self.normilize_target_speed(math.fabs(self.target_speed - person.movementSpeed))
-        if self.last_person_speed < person.movementSpeed and self.target_speed > self.last_person_speed \
-                or self.last_person_speed > person.movementSpeed and self.target_speed < self.last_person_speed:
-            v0 = + learn_speed * self.normilize_target_speed(math.fabs(self.target_speed - person.movementSpeed))
+        v0 = - learn_speed * (1 - self.normilize_distance(self.last_distance))
+        if self.last_distance > distance and person.movementSpeed != 0:
+            v0 = + learn_speed * self.normilize_distance(self.last_distance)
 
         if self.need_skip_learn > 0:
             self.need_skip_learn = self.need_skip_learn - 1
