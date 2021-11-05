@@ -21,7 +21,7 @@ modelFileName = 'rotation_spinal_cord_model.pth'
 activationTreshold = 0.5
 
 
-class RotationSpinalCordBaseLearner(BaseLearner):
+class RotationSpinalCordLearner(BaseLearner):
     environment: Environment
     controls: [Control]
     scores: [GameScore]
@@ -113,8 +113,8 @@ class RotationSpinalCordBaseLearner(BaseLearner):
             rotateDirection = 0
 
         orig_x = [
-            self.normilizeAngleDiff(angleDiff) if rotateDirection < 0 else 0.0,
-            self.normilizeAngleDiff(angleDiff) if rotateDirection > 0 else 0.0,
+            self.normilize_angle_diff(angleDiff) if rotateDirection < 0 else 0.0,
+            self.normilize_angle_diff(angleDiff) if rotateDirection > 0 else 0.0,
         ]
         X = torch.Tensor(np.array(orig_x)).float()
         X = X.to(device)
@@ -132,9 +132,9 @@ class RotationSpinalCordBaseLearner(BaseLearner):
         pred_y = [pred_y[0], pred_y[1]]
 
         learnSpeed = 0.5
-        v2 = - learnSpeed * self.normilizeAngleDiff(angleDiff)
+        v2 = - learnSpeed * self.normilize_angle_diff(angleDiff)
         if self.angleDiff > angleDiff:
-            v2 = + learnSpeed * self.normilizeAngleDiff(angleDiff)
+            v2 = + learnSpeed * self.normilize_angle_diff(angleDiff)
         if self.angleDiff == 0:
             v2 = 0
 
@@ -216,7 +216,7 @@ class RotationSpinalCordBaseLearner(BaseLearner):
         if pred[1] > activationTreshold and pred[1] > pred[0]:
             self.controls[0].rotateRight = True
 
-    def normilizeAngleDiff(self, angleDiff: float) -> float:
+    def normilize_angle_diff(self, angleDiff: float) -> float:
         padding = 80.0
         return (angleDiff + padding) / (180.0 + padding)
 
